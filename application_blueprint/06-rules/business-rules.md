@@ -1,0 +1,11 @@
+Rules:
+- Players must be registered to play
+- A new 5 letter word is selected each day
+- Players can only play a single game (word) each day
+- Players have 6 attempts at guessing the daily word
+- The league table ranks players by 1) Number of words got, 2) Average % of attempts to find a word, 3) Chains of daily plays without missing a day
+- Where a player does not guess the daily word, the word is shown to the player
+- If a player has not guessed the word but has unused attempts left, a player can resume playing in a subsequent session
+- Player registration requires a nick name only, no personal data is collected
+- New words are selected at 0001 Hrs each day
+- A list of recently used words, and the date to which it applied is kept for users to view
