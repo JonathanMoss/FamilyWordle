@@ -41,6 +41,29 @@ def create_app(db_uri: Optional[str] = None) -> Flask:
     # Create database tables
     SQLModel.metadata.create_all(engine)
     
+    # Auto-seed default admin if configured in environment
+    admin_username = os.getenv("ADMIN_USERNAME")
+    admin_pin = os.getenv("ADMIN_PIN")
+    if admin_username and admin_pin:
+        if admin_pin.isdigit() and len(admin_pin) == 4:
+            with Session(engine) as db_session:
+                stmt = select(Player).where(Player.username == admin_username)
+                existing = db_session.exec(stmt).first()
+                if not existing:
+                    hashed = hash_pin(admin_pin)
+                    admin_user = Player(
+                        username=admin_username,
+                        pin_hash=hashed,
+                        role="admin",
+                        status="active"
+                    )
+                    db_session.add(admin_user)
+                    db_session.commit()
+                    app.logger.info("Auto-seeded admin user '%s'", admin_username)
+        else:
+            app.logger.warning("ADMIN_PIN must be exactly 4 digits; admin auto-seeding skipped.")
+
+    
     # Register blueprints
     from src.app.routes.auth import auth_bp
     from src.app.routes.game import game_bp
