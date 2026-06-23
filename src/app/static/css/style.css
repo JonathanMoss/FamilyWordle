@@ -455,3 +455,53 @@ main {
 .grid-row.shake {
     animation: shake 0.3s ease-in-out;
 }
+
+/* Custom styling helper classes */
+.banner-daily {
+    background-color: #1e293b !important;
+}
+
+.banner-demo {
+    background-color: #8b5cf6 !important;
+}
+
+.history-item {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-glass);
+    display: flex;
+    justify-content: space-between;
+}
+
+.archive-item {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-glass);
+    display: flex;
+    justify-content: space-between;
+}
+
+.archive-word {
+    font-family: var(--font-mono);
+    letter-spacing: 1px;
+}
+
+.text-success {
+    color: #10b981;
+}
+
+.text-danger {
+    color: #ef4444;
+}
+
+.text-warning {
+    color: #f59e0b;
+}
+
+.ml-2 {
+    margin-left: 6px;
+}
+
+.btn-danger {
+    background: #ef4444 !important;
+    border-color: #ef4444 !important;
+}
+
