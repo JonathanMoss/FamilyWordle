@@ -1,16 +1,37 @@
 // FamilyWordle SPA Client Logic
 
-let activeView = "auth-view";
-let authMode = "login"; // 'login' or 'register'
+// Configuration Constants
+const GAME_CONFIG = {
+    MAX_ROWS: 6,
+    WORD_LENGTH: 5,
+    FLIP_STEP_MS: 100,
+    FLIP_DURATION_MS: 500
+};
 
-// Game state
-let isDemoMode = false;
-let gameState = "not_started"; // 'not_started', 'playing', 'won', 'lost', 'expired'
-let currentRow = 0;
-let currentTile = 0;
-let boardState = ["", "", "", "", "", ""]; // letters entered in rows
-let guessesHistory = []; // [{word: '...', feedback: [...]}]
-let timerInterval = null;
+// Encapsulated Application State
+const appState = {
+    activeView: "auth-view",
+    authMode: "login", // 'login' or 'register'
+    isDemoMode: false,
+    gameState: "not_started", // 'not_started', 'playing', 'won', 'lost', 'expired'
+    currentRow: 0,
+    currentTile: 0,
+    boardState: Array(GAME_CONFIG.MAX_ROWS).fill(""), // letters entered in rows
+    guessesHistory: [], // [{word: '...', feedback: [...]}]
+    timerInterval: null
+};
+
+// Helper to reset appState
+function resetAppState() {
+    appState.currentRow = 0;
+    appState.currentTile = 0;
+    appState.boardState = Array(GAME_CONFIG.MAX_ROWS).fill("");
+    appState.guessesHistory = [];
+    if (appState.timerInterval) {
+        clearInterval(appState.timerInterval);
+        appState.timerInterval = null;
+    }
+}
 
 // Virtual Keyboard layout
 const KEYBOARD_LAYOUT = [
@@ -18,6 +39,30 @@ const KEYBOARD_LAYOUT = [
     ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
     ["enter", "z", "x", "c", "v", "b", "n", "m", "backspace"]
 ];
+
+// Safe unified API Fetch Handler
+async function apiRequest(url, options = {}) {
+    try {
+        const response = await fetch(url, options);
+        let data = {};
+        try {
+            data = await response.json();
+        } catch (jsonErr) {
+            // response might not have json body (e.g. empty or text error)
+        }
+        
+        if (!response.ok) {
+            const errorMsg = data.error || data.details || `Request failed with status ${response.status}`;
+            console.error(`API request failed [${url}]:`, errorMsg);
+            return { ok: false, error: errorMsg, status: response.status };
+        }
+        
+        return { ok: true, data, status: response.status };
+    } catch (err) {
+        console.error(`Network or system error requesting [${url}]:`, err);
+        return { ok: false, error: "Server connection error." };
+    }
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     // Render initial grid structure
@@ -38,31 +83,38 @@ function showView(viewId) {
     const activeSection = document.getElementById(viewId);
     if (activeSection) {
         activeSection.classList.add("active");
-        activeView = viewId;
+        appState.activeView = viewId;
     }
 }
 
 // Authentication Handlers
 function toggleAuthMode(e) {
     if (e) e.preventDefault();
-    if (authMode === "login") {
-        authMode = "register";
-        document.getElementById("auth-title").innerText = "Register Player";
-        document.getElementById("auth-subtitle").innerText = "Create a nickname and 4-digit PIN";
-        document.getElementById("btn-toggle-auth").innerText = "Have an account? Sign in here";
-        document.getElementById("btn-auth-submit").innerText = "Register";
+    const title = document.getElementById("auth-title");
+    const subtitle = document.getElementById("auth-subtitle");
+    const toggleBtn = document.getElementById("btn-toggle-auth");
+    const submitBtn = document.getElementById("btn-auth-submit");
+    
+    if (appState.authMode === "login") {
+        appState.authMode = "register";
+        if (title) title.innerText = "Register Player";
+        if (subtitle) subtitle.innerText = "Create a nickname and 4-digit PIN";
+        if (toggleBtn) toggleBtn.innerText = "Have an account? Sign in here";
+        if (submitBtn) submitBtn.innerText = "Register";
     } else {
-        authMode = "login";
-        document.getElementById("auth-title").innerText = "Sign In";
-        document.getElementById("auth-subtitle").innerText = "Enter your name and PIN to play";
-        document.getElementById("btn-toggle-auth").innerText = "Need an account? Register here";
-        document.getElementById("btn-auth-submit").innerText = "Sign In";
+        appState.authMode = "login";
+        if (title) title.innerText = "Sign In";
+        if (subtitle) subtitle.innerText = "Enter your name and PIN to play";
+        if (toggleBtn) toggleBtn.innerText = "Need an account? Register here";
+        if (submitBtn) submitBtn.innerText = "Sign In";
     }
 }
 
 async function handleAuthSubmit() {
     const usernameInput = document.getElementById("auth-username");
     const pinInput = document.getElementById("auth-pin");
+    if (!usernameInput || !pinInput) return;
+    
     const username = usernameInput.value.trim();
     const pin = pinInput.value.trim();
     
@@ -71,87 +123,97 @@ async function handleAuthSubmit() {
         return;
     }
     
-    const url = authMode === "login" ? "/api/auth/login" : "/api/auth/register";
-    try {
-        const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username, pin })
-        });
-        
-        const data = await response.json();
-        if (!response.ok) {
-            showToast(data.error || data.details || "Authentication failed");
-            return;
-        }
-        
-        showToast(data.message);
-        usernameInput.value = "";
-        pinInput.value = "";
-        
-        if (authMode === "register") {
-            // Switch to login mode
-            toggleAuthMode();
-        } else {
-            // Signed in! Setup views and game
-            isDemoMode = false;
-            updateNavActions(data.username, data.role);
-            loadActiveGame();
-        }
-    } catch (err) {
-        showToast("Server connection error.");
+    const url = appState.authMode === "login" ? "/api/auth/login" : "/api/auth/register";
+    const result = await apiRequest(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, pin })
+    });
+    
+    if (!result.ok) {
+        showToast(result.error);
+        return;
+    }
+    
+    const data = result.data;
+    showToast(data.message);
+    usernameInput.value = "";
+    pinInput.value = "";
+    
+    if (appState.authMode === "register") {
+        // Switch to login mode
+        toggleAuthMode();
+    } else {
+        // Signed in! Setup views and game
+        appState.isDemoMode = false;
+        updateNavActions(data.username, data.role);
+        loadActiveGame();
     }
 }
 
 async function checkActiveSession() {
-    try {
-        const response = await fetch("/api/game/state");
-        if (response.ok) {
-            const data = await response.json();
-            // User is signed in!
-            // Expose the username using navbar details (expose Stats/League button)
-            // But we don't have username in `/api/game/state`, so we check current details
-            // We can fetch user stats or just load active game to query
-            updateNavActions("Player", "player"); // default fallback, will correct on stats call
-            loadActiveGame();
-        }
-    } catch (err) {}
+    const result = await apiRequest("/api/game/state");
+    if (result.ok) {
+        // User is signed in!
+        updateNavActions("Player", "player"); // default fallback, will correct on stats call
+        loadActiveGame();
+    }
 }
 
 function updateNavActions(username, role) {
-    document.getElementById("btn-show-login").style.display = "none";
-    document.getElementById("btn-show-stats").style.display = "inline-flex";
-    document.getElementById("btn-show-league").style.display = "inline-flex";
-    document.getElementById("btn-show-archive").style.display = "inline-flex";
-    document.getElementById("btn-logout").style.display = "inline-flex";
+    const btnShowLogin = document.getElementById("btn-show-login");
+    const btnShowStats = document.getElementById("btn-show-stats");
+    const btnShowLeague = document.getElementById("btn-show-league");
+    const btnShowArchive = document.getElementById("btn-show-archive");
+    const btnLogout = document.getElementById("btn-logout");
+    const btnShowAdmin = document.getElementById("btn-show-admin");
+    
+    if (btnShowLogin) btnShowLogin.style.display = "none";
+    if (btnShowStats) btnShowStats.style.display = "inline-flex";
+    if (btnShowLeague) btnShowLeague.style.display = "inline-flex";
+    if (btnShowArchive) btnShowArchive.style.display = "inline-flex";
+    if (btnLogout) btnLogout.style.display = "inline-flex";
     
     if (role === "admin") {
-        document.getElementById("btn-show-admin").style.display = "inline-flex";
+        if (btnShowAdmin) btnShowAdmin.style.display = "inline-flex";
     } else {
-        document.getElementById("btn-show-admin").style.display = "none";
+        if (btnShowAdmin) btnShowAdmin.style.display = "none";
     }
 }
 
 async function handleLogout() {
-    try {
-        await fetch("/api/auth/logout", { method: "POST" });
-        sessionClearUI();
+    const result = await apiRequest("/api/auth/logout", { method: "POST" });
+    sessionClearUI();
+    if (result.ok) {
         showToast("Signed out successfully");
-    } catch (err) {}
+    } else {
+        showToast(result.error);
+    }
 }
 
 function sessionClearUI() {
-    document.getElementById("btn-show-login").style.display = "inline-flex";
-    document.getElementById("btn-show-stats").style.display = "none";
-    document.getElementById("btn-show-league").style.display = "none";
-    document.getElementById("btn-show-archive").style.display = "none";
-    document.getElementById("btn-show-admin").style.display = "none";
-    document.getElementById("btn-logout").style.display = "none";
+    const btnShowLogin = document.getElementById("btn-show-login");
+    const btnShowStats = document.getElementById("btn-show-stats");
+    const btnShowLeague = document.getElementById("btn-show-league");
+    const btnShowArchive = document.getElementById("btn-show-archive");
+    const btnShowAdmin = document.getElementById("btn-show-admin");
+    const btnLogout = document.getElementById("btn-logout");
+    const gameTimer = document.getElementById("game-timer");
     
-    clearInterval(timerInterval);
-    document.getElementById("game-timer").innerText = "";
+    if (btnShowLogin) btnShowLogin.style.display = "inline-flex";
+    if (btnShowStats) btnShowStats.style.display = "none";
+    if (btnShowLeague) btnShowLeague.style.display = "none";
+    if (btnShowArchive) btnShowArchive.style.display = "none";
+    if (btnShowAdmin) btnShowAdmin.style.display = "none";
+    if (btnLogout) btnLogout.style.display = "none";
     
-    isDemoMode = false;
+    if (appState.timerInterval) {
+        clearInterval(appState.timerInterval);
+        appState.timerInterval = null;
+    }
+    if (gameTimer) gameTimer.innerText = "";
+    
+    appState.isDemoMode = false;
     resetGridUI();
     showView("auth-view");
 }
@@ -159,12 +221,13 @@ function sessionClearUI() {
 // Wordle Grid Construction
 function initializeGrid() {
     const grid = document.getElementById("game-grid");
+    if (!grid) return;
     grid.innerHTML = "";
-    for (let r = 0; r < 6; r++) {
+    for (let r = 0; r < GAME_CONFIG.MAX_ROWS; r++) {
         const rowDiv = document.createElement("div");
         rowDiv.className = "grid-row";
         rowDiv.id = `row-${r}`;
-        for (let c = 0; c < 5; c++) {
+        for (let c = 0; c < GAME_CONFIG.WORD_LENGTH; c++) {
             const tileDiv = document.createElement("div");
             tileDiv.className = "tile";
             tileDiv.id = `tile-${r}-${c}`;
@@ -175,10 +238,7 @@ function initializeGrid() {
 }
 
 function resetGridUI() {
-    currentRow = 0;
-    currentTile = 0;
-    boardState = ["", "", "", "", "", ""];
-    guessesHistory = [];
+    resetAppState();
     initializeGrid();
     resetKeyboardColors();
 }
@@ -186,6 +246,7 @@ function resetGridUI() {
 // Keyboard rendering
 function initializeKeyboard() {
     const kb = document.getElementById("keyboard");
+    if (!kb) return;
     kb.innerHTML = "";
     KEYBOARD_LAYOUT.forEach(row => {
         const rowDiv = document.createElement("div");
@@ -217,6 +278,7 @@ function resetKeyboardColors() {
 // Toast Notification
 function showToast(message, duration = 2500) {
     const toast = document.getElementById("toast");
+    if (!toast) return;
     toast.innerText = message;
     toast.classList.add("show");
     setTimeout(() => {
@@ -226,57 +288,62 @@ function showToast(message, duration = 2500) {
 
 // Gameplay Loop
 async function loadActiveGame() {
-    try {
-        const response = await fetch("/api/game/state");
-        if (!response.ok) {
-            sessionClearUI();
-            return;
-        }
-        const data = await response.json();
-        
-        resetGridUI();
-        isDemoMode = false;
-        gameState = data.status;
-        currentRow = data.attempts_used;
-        guessesHistory = data.guesses;
-        
-        document.getElementById("game-mode-banner").innerText = "DAILY GAME";
-        document.getElementById("game-mode-banner").style.background = "#1e293b";
-        document.getElementById("demo-exit-container").style.display = "none";
-        
-        // Fill in previous guesses
-        guessesHistory.forEach((g, idx) => {
-            renderRowWithFeedback(idx, g.word, g.feedback);
-            updateKeyboardColors(g.word, g.feedback);
-        });
-        
-        showView("game-view");
-        
-        // Setup rollover countdown clock
-        startCountdown(data.remaining_seconds);
-        
-        if (gameState === "won") {
-            showToast("Congratulations, you won!");
-        } else if (gameState === "lost") {
-            showToast(`Daily word was: ${data.target_word}`);
-        } else if (gameState === "expired") {
-            showToast("Today's game has expired!");
-        }
-    } catch (err) {
-        showToast("Error loading daily game.");
+    const result = await apiRequest("/api/game/state");
+    if (!result.ok) {
+        sessionClearUI();
+        return;
+    }
+    const data = result.data;
+    
+    resetGridUI();
+    appState.isDemoMode = false;
+    appState.gameState = data.status;
+    appState.currentRow = data.attempts_used;
+    appState.guessesHistory = data.guesses;
+    
+    const banner = document.getElementById("game-mode-banner");
+    if (banner) {
+        banner.innerText = "DAILY GAME";
+        banner.style.background = ""; // Clear inline background style to fallback on CSS classes
+        banner.className = "banner-daily";
+    }
+    const demoExit = document.getElementById("demo-exit-container");
+    if (demoExit) {
+        demoExit.style.display = "none";
+    }
+    
+    // Fill in previous guesses
+    appState.guessesHistory.forEach((g, idx) => {
+        renderRowWithFeedback(idx, g.word, g.feedback);
+        updateKeyboardColors(g.word, g.feedback);
+    });
+    
+    showView("game-view");
+    
+    // Setup rollover countdown clock
+    startCountdown(data.remaining_seconds);
+    
+    if (appState.gameState === "won") {
+        showToast("Congratulations, you won!");
+    } else if (appState.gameState === "lost") {
+        showToast(`Daily word was: ${data.target_word}`);
+    } else if (appState.gameState === "expired") {
+        showToast("Today's game has expired!");
     }
 }
 
 function renderRowWithFeedback(rIdx, word, feedback) {
-    for (let c = 0; c < 5; c++) {
+    for (let c = 0; c < GAME_CONFIG.WORD_LENGTH; c++) {
         const tile = document.getElementById(`tile-${rIdx}-${c}`);
-        tile.innerText = word[c];
-        tile.classList.add(feedback[c]);
+        if (tile) {
+            tile.innerText = word[c];
+            tile.classList.add(feedback[c]);
+        }
     }
 }
 
 function updateKeyboardColors(word, feedback) {
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < word.length; i++) {
         const char = word[i].toLowerCase();
         const feedbackClass = feedback[i];
         const keyBtn = document.getElementById(`key-${char}`);
@@ -300,17 +367,24 @@ function updateKeyboardColors(word, feedback) {
 
 // Timer Countdown
 function startCountdown(seconds) {
-    clearInterval(timerInterval);
-    if (isDemoMode) {
-        document.getElementById("game-timer").innerText = "Practice Mode";
+    if (appState.timerInterval) {
+        clearInterval(appState.timerInterval);
+    }
+    const timerElement = document.getElementById("game-timer");
+    if (!timerElement) return;
+
+    if (appState.isDemoMode) {
+        timerElement.innerText = "Practice Mode";
         return;
     }
     
     let timer = seconds;
     const renderTime = () => {
         if (timer <= 0) {
-            clearInterval(timerInterval);
-            document.getElementById("game-timer").innerText = "Rollover active. Resetting...";
+            if (appState.timerInterval) {
+                clearInterval(appState.timerInterval);
+            }
+            timerElement.innerText = "Rollover active. Resetting...";
             // Reload active game for new word
             setTimeout(loadActiveGame, 1000);
             return;
@@ -318,18 +392,18 @@ function startCountdown(seconds) {
         const hrs = Math.floor(timer / 3600);
         const mins = Math.floor((timer % 3600) / 60);
         const secs = timer % 60;
-        document.getElementById("game-timer").innerText = 
+        timerElement.innerText = 
             `Next Daily Word in: ${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
         timer--;
     };
     
     renderTime();
-    timerInterval = setInterval(renderTime, 1000);
+    appState.timerInterval = setInterval(renderTime, 1000);
 }
 
 // Key Presses Handlers
 function handlePhysicalKeyDown(e) {
-    if (activeView !== "game-view") return;
+    if (appState.activeView !== "game-view") return;
     
     // Ignore key presses during open modals
     if (document.querySelector(".modal-overlay.active")) return;
@@ -344,7 +418,7 @@ function handlePhysicalKeyDown(e) {
 }
 
 function handleVirtualKeyPress(key) {
-    if (activeView !== "game-view") return;
+    if (appState.activeView !== "game-view") return;
     
     if (key === "enter") {
         submitInputGuess();
@@ -356,117 +430,139 @@ function handleVirtualKeyPress(key) {
 }
 
 function addInputChar(char) {
-    if (gameState !== "playing" && gameState !== "not_started") return;
-    if (currentTile >= 5) return;
+    if (appState.gameState !== "playing" && appState.gameState !== "not_started") return;
+    if (appState.currentTile >= GAME_CONFIG.WORD_LENGTH) return;
     
-    const tile = document.getElementById(`tile-${currentRow}-${currentTile}`);
+    const tile = document.getElementById(`tile-${appState.currentRow}-${appState.currentTile}`);
+    if (!tile) return;
     tile.innerText = char;
     tile.classList.add("pop");
     
-    boardState[currentRow] = boardState[currentRow] + char;
-    currentTile++;
+    appState.boardState[appState.currentRow] = appState.boardState[appState.currentRow] + char;
+    appState.currentTile++;
 }
 
 function deleteInputChar() {
-    if (gameState !== "playing" && gameState !== "not_started") return;
-    if (currentTile <= 0) return;
+    if (appState.gameState !== "playing" && appState.gameState !== "not_started") return;
+    if (appState.currentTile <= 0) return;
     
-    currentTile--;
-    const tile = document.getElementById(`tile-${currentRow}-${currentTile}`);
+    appState.currentTile--;
+    const tile = document.getElementById(`tile-${appState.currentRow}-${appState.currentTile}`);
+    if (!tile) return;
     tile.innerText = "";
     tile.className = "tile";
     
-    boardState[currentRow] = boardState[currentRow].slice(0, -1);
+    appState.boardState[appState.currentRow] = appState.boardState[appState.currentRow].slice(0, -1);
 }
 
 async function submitInputGuess() {
-    if (gameState !== "playing" && gameState !== "not_started") return;
+    if (appState.gameState !== "playing" && appState.gameState !== "not_started") return;
     
-    const guess = boardState[currentRow] || "";
-    if (guess.length < 5) {
+    const guess = appState.boardState[appState.currentRow] || "";
+    if (guess.length < GAME_CONFIG.WORD_LENGTH) {
         showToast("Not enough letters");
-        shakeRow(currentRow);
+        shakeRow(appState.currentRow);
         return;
     }
     
-    const url = isDemoMode ? "/api/game/demo/guess" : "/api/game/guess";
+    const url = appState.isDemoMode ? "/api/game/demo/guess" : "/api/game/guess";
     
-    try {
-        const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ guess })
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-            showToast(data.error || data.details || "Invalid guess");
-            shakeRow(currentRow);
-            return;
-        }
-        
-        // Success guess: execute flip animation
-        animateRowFlip(currentRow, guess, data.feedback, () => {
-            gameState = data.status;
-            currentRow++;
-            currentTile = 0;
-            
-            // Check end states
-            if (data.status === "won") {
-                showToast("Congratulations!");
-            } else if (data.status === "lost") {
-                showToast(`Game Over. Word was: ${data.target_word}`);
-            }
-        });
-        
-    } catch (err) {
-        showToast("Server connection error.");
+    const previousState = appState.gameState;
+    appState.gameState = "processing";
+    
+    const result = await apiRequest(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guess })
+    });
+    
+    if (!result.ok) {
+        appState.gameState = previousState;
+        showToast(result.error);
+        shakeRow(appState.currentRow);
+        return;
+    }
+    
+    const data = result.data;
+    
+    // Execute flip animation
+    await animateRowFlip(appState.currentRow, guess, data.feedback);
+    
+    appState.gameState = data.status;
+    appState.currentRow++;
+    appState.currentTile = 0;
+    
+    // Check end states
+    if (data.status === "won") {
+        showToast("Congratulations!");
+    } else if (data.status === "lost") {
+        showToast(`Game Over. Word was: ${data.target_word}`);
     }
 }
 
 function shakeRow(rowIdx) {
     const row = document.getElementById(`row-${rowIdx}`);
+    if (!row) return;
     row.classList.add("shake");
     setTimeout(() => {
         row.classList.remove("shake");
     }, 300);
 }
 
-function animateRowFlip(rowIdx, word, feedback, callback) {
-    for (let c = 0; c < 5; c++) {
-        const tile = document.getElementById(`tile-${rowIdx}-${c}`);
-        
-        // Stagger transitions slightly
+function animateTileFlip(tile, feedbackClass, char, index) {
+    return new Promise((resolve) => {
         setTimeout(() => {
             tile.classList.add("flip");
             
-            // Halfway through flip, change colors
+            // Halfway through flip (250ms), change colors
             setTimeout(() => {
-                tile.classList.add(feedback[c]);
-                updateKeyboardColors(word, feedback);
+                tile.classList.add(feedbackClass);
+                updateKeyboardColors(char, [feedbackClass]);
             }, 250);
             
             // Complete animation removal
             setTimeout(() => {
                 tile.classList.remove("flip");
-                if (c === 4 && callback) callback();
+                resolve();
             }, 500);
             
-        }, c * 100);
+        }, index * GAME_CONFIG.FLIP_STEP_MS);
+    });
+}
+
+async function animateRowFlip(rowIdx, word, feedback) {
+    const promises = [];
+    for (let c = 0; c < GAME_CONFIG.WORD_LENGTH; c++) {
+        const tile = document.getElementById(`tile-${rowIdx}-${c}`);
+        if (tile) {
+            promises.push(animateTileFlip(tile, feedback[c], word[c], c));
+        }
     }
+    await Promise.all(promises);
+    // Add brief extra padding delay to align completely with transition finishes
+    await new Promise((resolve) => setTimeout(resolve, GAME_CONFIG.FLIP_DURATION_MS));
 }
 
 // Practice / Demo Mode
 function startDemoMode() {
-    isDemoMode = true;
-    gameState = "playing";
+    appState.isDemoMode = true;
+    appState.gameState = "playing";
     resetGridUI();
     
-    document.getElementById("game-mode-banner").innerText = "DEMO MODE";
-    document.getElementById("game-mode-banner").style.background = "#8b5cf6"; // demo purple
-    document.getElementById("demo-exit-container").style.display = "block";
-    document.getElementById("game-timer").innerText = "Practice Mode";
+    const banner = document.getElementById("game-mode-banner");
+    if (banner) {
+        banner.innerText = "DEMO MODE";
+        banner.style.background = ""; // Clear inline background style to fallback on CSS classes
+        banner.className = "banner-demo";
+    }
+    const exitContainer = document.getElementById("demo-exit-container");
+    if (exitContainer) {
+        exitContainer.style.display = "block";
+    }
+    const timerElement = document.getElementById("game-timer");
+    if (timerElement) {
+        timerElement.innerText = "Practice Mode";
+    }
     
     showView("game-view");
 }
@@ -476,19 +572,27 @@ function exitDemoMode() {
 }
 
 async function resetDemoMode() {
-    try {
-        await fetch("/api/game/demo/reset", { method: "POST" });
+    const result = await apiRequest("/api/game/demo/reset", { method: "POST" });
+    if (result.ok) {
         startDemoMode();
-    } catch (err) {}
+    } else {
+        showToast(result.error);
+    }
 }
 
 // Modals control
 function openModal(id) {
-    document.getElementById(id).classList.add("active");
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.classList.add("active");
+    }
 }
 
 function closeModal(id) {
-    document.getElementById(id).classList.remove("active");
+    const modal = document.getElementById(id);
+    if (modal) {
+        modal.classList.remove("active");
+    }
 }
 
 function closeModalOnOuterClick(e, id) {
@@ -499,101 +603,151 @@ function closeModalOnOuterClick(e, id) {
 
 // Fetch stats and fill modal
 async function openStatsModal() {
-    try {
-        const response = await fetch("/api/stats");
-        if (!response.ok) return;
-        const data = await response.json();
-        
-        document.getElementById("stat-played").innerText = data.games_played;
-        document.getElementById("stat-wins").innerText = data.games_won;
-        document.getElementById("stat-win-pct").innerText = `${data.win_percentage}%`;
-        document.getElementById("stat-streak").innerText = data.current_streak;
-        
-        // Fill history
-        const list = document.getElementById("stats-history-list");
+    const result = await apiRequest("/api/stats");
+    if (!result.ok) {
+        showToast("Error retrieving statistics.");
+        return;
+    }
+    const data = result.data;
+    
+    const playedEl = document.getElementById("stat-played");
+    const winsEl = document.getElementById("stat-wins");
+    const winPctEl = document.getElementById("stat-win-pct");
+    const streakEl = document.getElementById("stat-streak");
+    
+    if (playedEl) playedEl.textContent = data.games_played;
+    if (winsEl) winsEl.textContent = data.games_won;
+    if (winPctEl) winPctEl.textContent = `${data.win_percentage}%`;
+    if (streakEl) streakEl.textContent = data.current_streak;
+    
+    // Fill history
+    const list = document.getElementById("stats-history-list");
+    if (list) {
         list.innerHTML = "";
         if (data.history.length === 0) {
-            list.innerHTML = `<div style="color:var(--text-muted); text-align:center;">No completed games yet.</div>`;
+            const noGamesDiv = document.createElement("div");
+            noGamesDiv.className = "text-muted";
+            noGamesDiv.style.textAlign = "center";
+            noGamesDiv.textContent = "No completed games yet.";
+            list.appendChild(noGamesDiv);
         } else {
             data.history.forEach(h => {
                 const item = document.createElement("div");
-                item.style.padding = "8px 0";
-                item.style.borderBottom = "1px solid var(--border-glass)";
-                item.style.display = "flex";
-                item.style.justifyContent = "space-between";
-                item.innerHTML = `
-                    <span>📅 ${h.date}</span>
-                    <span>🔤 <strong>${h.word}</strong></span>
-                    <span style="color:${h.result === 'win' ? '#10b981' : '#ef4444'}">${h.result === 'win' ? `${h.attempts} attempts` : 'failed'}</span>
-                `;
+                item.className = "history-item";
+                
+                const dateSpan = document.createElement("span");
+                dateSpan.textContent = `📅 ${h.date}`;
+                
+                const wordSpan = document.createElement("span");
+                wordSpan.textContent = "🔤 ";
+                const wordStrong = document.createElement("strong");
+                wordStrong.textContent = h.word;
+                wordSpan.appendChild(wordStrong);
+                
+                const resultSpan = document.createElement("span");
+                resultSpan.className = h.result === 'win' ? "text-success" : "text-danger";
+                resultSpan.textContent = h.result === 'win' ? `${h.attempts} attempts` : 'failed';
+                
+                item.appendChild(dateSpan);
+                item.appendChild(wordSpan);
+                item.appendChild(resultSpan);
                 list.appendChild(item);
             });
         }
-        
-        openModal("modal-stats");
-    } catch (err) {
-        showToast("Error retrieving statistics.");
     }
+    
+    openModal("modal-stats");
 }
 
 // Fetch league table
 async function openLeagueModal() {
-    try {
-        const response = await fetch("/api/stats/league");
-        if (!response.ok) return;
-        const data = await response.json();
-        
-        const body = document.getElementById("league-table-body");
+    const result = await apiRequest("/api/stats/league");
+    if (!result.ok) {
+        showToast("Error retrieving rankings.");
+        return;
+    }
+    const data = result.data;
+    
+    const body = document.getElementById("league-table-body");
+    if (body) {
         body.innerHTML = "";
         data.rankings.forEach(row => {
             const tr = document.createElement("tr");
-            tr.innerHTML = `
-                <td><strong>${row.rank}</strong></td>
-                <td>${row.username}</td>
-                <td>${row.games_played}</td>
-                <td>${row.games_won}</td>
-                <td>${row.average_attempts}</td>
-                <td>🔥 ${row.current_streak}</td>
-            `;
+            
+            const tdRank = document.createElement("td");
+            const strongRank = document.createElement("strong");
+            strongRank.textContent = row.rank;
+            tdRank.appendChild(strongRank);
+            
+            const tdPlayer = document.createElement("td");
+            tdPlayer.textContent = row.username;
+            
+            const tdPlayed = document.createElement("td");
+            tdPlayed.textContent = row.games_played;
+            
+            const tdWins = document.createElement("td");
+            tdWins.textContent = row.games_won;
+            
+            const tdAvg = document.createElement("td");
+            tdAvg.textContent = row.average_attempts;
+            
+            const tdStreak = document.createElement("td");
+            tdStreak.textContent = `🔥 ${row.current_streak}`;
+            
+            tr.appendChild(tdRank);
+            tr.appendChild(tdPlayer);
+            tr.appendChild(tdPlayed);
+            tr.appendChild(tdWins);
+            tr.appendChild(tdAvg);
+            tr.appendChild(tdStreak);
             body.appendChild(tr);
         });
-        
-        openModal("modal-league");
-    } catch (err) {
-        showToast("Error retrieving rankings.");
     }
+    
+    openModal("modal-league");
 }
 
 // Fetch archives
 async function openArchiveModal() {
-    try {
-        const response = await fetch("/api/archive");
-        if (!response.ok) return;
-        const data = await response.json();
-        
-        const list = document.getElementById("archive-list");
+    const result = await apiRequest("/api/archive");
+    if (!result.ok) {
+        showToast("Error retrieving archive.");
+        return;
+    }
+    const data = result.data;
+    
+    const list = document.getElementById("archive-list");
+    if (list) {
         list.innerHTML = "";
         if (data.archive.length === 0) {
-            list.innerHTML = `<div style="color:var(--text-muted); text-align:center; padding:16px;">Archive is empty. Check back tomorrow!</div>`;
+            const emptyDiv = document.createElement("div");
+            emptyDiv.className = "text-muted";
+            emptyDiv.style.textAlign = "center";
+            emptyDiv.style.padding = "16px";
+            emptyDiv.textContent = "Archive is empty. Check back tomorrow!";
+            list.appendChild(emptyDiv);
         } else {
             data.archive.forEach(w => {
                 const div = document.createElement("div");
-                div.style.padding = "10px 0";
-                div.style.borderBottom = "1px solid var(--border-glass)";
-                div.style.display = "flex";
-                div.style.justifyContent = "space-between";
-                div.innerHTML = `
-                    <span>📅 ${w.date}</span>
-                    <span style="font-family:var(--font-mono); letter-spacing:1px;"><strong>${w.word}</strong></span>
-                `;
+                div.className = "archive-item";
+                
+                const dateSpan = document.createElement("span");
+                dateSpan.textContent = `📅 ${w.date}`;
+                
+                const wordSpan = document.createElement("span");
+                wordSpan.className = "archive-word";
+                const wordStrong = document.createElement("strong");
+                wordStrong.textContent = w.word;
+                wordSpan.appendChild(wordStrong);
+                
+                div.appendChild(dateSpan);
+                div.appendChild(wordSpan);
                 list.appendChild(div);
             });
         }
-        
-        openModal("modal-archive");
-    } catch (err) {
-        showToast("Error retrieving archive.");
     }
+    
+    openModal("modal-archive");
 }
 
 // Help Modal
@@ -603,40 +757,65 @@ function openHelpModal() {
 
 // Admin Panel operations (Admin Only)
 async function openAdminModal() {
-    try {
-        const response = await fetch("/api/admin/players");
-        if (!response.ok) {
-            showToast("Access Denied");
-            return;
-        }
-        const data = await response.json();
-        renderAdminTable(data.players);
-        openModal("modal-admin");
-    } catch (err) {
-        showToast("Error retrieving administrator list.");
+    const result = await apiRequest("/api/admin/players");
+    if (!result.ok) {
+        showToast("Access Denied");
+        return;
     }
+    renderAdminTable(result.data.players);
+    openModal("modal-admin");
 }
 
 function renderAdminTable(players) {
     const body = document.getElementById("admin-table-body");
+    if (!body) return;
     body.innerHTML = "";
     players.forEach(p => {
         const tr = document.createElement("tr");
         
+        const tdName = document.createElement("td");
+        const strongName = document.createElement("strong");
+        strongName.textContent = p.username;
+        tdName.appendChild(strongName);
+        
+        const tdRole = document.createElement("td");
+        tdRole.textContent = p.role;
+        
+        const tdStatus = document.createElement("td");
+        const statusSpan = document.createElement("span");
+        statusSpan.className = p.status === "active" ? "text-success" : "text-warning";
+        statusSpan.textContent = p.status;
+        tdStatus.appendChild(statusSpan);
+        
+        const tdActions = document.createElement("td");
+        
+        // Rename button
+        const renameBtn = document.createElement("button");
+        renameBtn.className = "btn-premium";
+        renameBtn.textContent = "Rename";
+        renameBtn.addEventListener("click", () => renamePlayerAdmin(p.username));
+        tdActions.appendChild(renameBtn);
+        
         // Status toggle button
         const toggleBtnText = p.status === "active" ? "Disable" : "Enable";
         const targetStatus = p.status === "active" ? "disabled" : "active";
+        const toggleBtn = document.createElement("button");
+        toggleBtn.className = "btn-premium ml-2";
+        toggleBtn.textContent = toggleBtnText;
+        toggleBtn.addEventListener("click", () => updatePlayerAdmin(p.username, targetStatus, null));
+        tdActions.appendChild(toggleBtn);
         
-        tr.innerHTML = `
-            <td><strong>${p.username}</strong></td>
-            <td>${p.role}</td>
-            <td><span style="color:${p.status === 'active' ? '#10b981' : '#f59e0b'}">${p.status}</span></td>
-            <td>
-                <button class="btn-premium" onclick="renamePlayerAdmin('${p.username}')">Rename</button>
-                <button class="btn-premium" onclick="updatePlayerAdmin('${p.username}', '${targetStatus}', null)" style="margin-left:6px;">${toggleBtnText}</button>
-                <button class="btn-premium" onclick="removePlayerAdmin('${p.username}')" style="background:#ef4444; border-color:#ef4444; margin-left:6px;">Remove</button>
-            </td>
-        `;
+        // Remove button
+        const removeBtn = document.createElement("button");
+        removeBtn.className = "btn-premium btn-danger ml-2";
+        removeBtn.textContent = "Remove";
+        removeBtn.addEventListener("click", () => removePlayerAdmin(p.username));
+        tdActions.appendChild(removeBtn);
+        
+        tr.appendChild(tdName);
+        tr.appendChild(tdRole);
+        tr.appendChild(tdStatus);
+        tr.appendChild(tdActions);
         body.appendChild(tr);
     });
 }
@@ -649,59 +828,60 @@ async function renamePlayerAdmin(username) {
         showToast("Invalid username");
         return;
     }
-    try {
-        const response = await fetch(`/api/admin/players/${username}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username: trimmed })
-        });
-        const data = await response.json();
-        if (response.ok) {
-            showToast("Player renamed successfully");
-            const res = await fetch("/api/admin/players");
-            const refreshData = await res.json();
-            renderAdminTable(refreshData.players);
-        } else {
-            showToast(data.error || "Failed to rename player");
+    
+    const result = await apiRequest(`/api/admin/players/${username}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: trimmed })
+    });
+    
+    if (result.ok) {
+        showToast("Player renamed successfully");
+        const listResult = await apiRequest("/api/admin/players");
+        if (listResult.ok) {
+            renderAdminTable(listResult.data.players);
         }
-    } catch (err) {
-        showToast("Error renaming player");
+    } else {
+        showToast(result.error);
     }
 }
 
 async function updatePlayerAdmin(username, status, role) {
-    try {
-        const payload = {};
-        if (status) payload.status = status;
-        if (role) payload.role = role;
-        
-        const response = await fetch(`/api/admin/players/${username}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-        });
-        
-        if (response.ok) {
-            showToast("Player updated successfully");
-            // Refresh table
-            const res = await fetch("/api/admin/players");
-            const data = await res.json();
-            renderAdminTable(data.players);
+    const payload = {};
+    if (status) payload.status = status;
+    if (role) payload.role = role;
+    
+    const result = await apiRequest(`/api/admin/players/${username}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    });
+    
+    if (result.ok) {
+        showToast("Player updated successfully");
+        const listResult = await apiRequest("/api/admin/players");
+        if (listResult.ok) {
+            renderAdminTable(listResult.data.players);
         }
-    } catch (err) {}
+    } else {
+        showToast(result.error);
+    }
 }
 
 async function removePlayerAdmin(username) {
     if (!confirm(`Are you sure you want to remove player "${username}"?`)) return;
-    try {
-        const response = await fetch(`/api/admin/players/${username}`, {
-            method: "DELETE"
-        });
-        if (response.ok) {
-            showToast("Player removed successfully");
-            const res = await fetch("/api/admin/players");
-            const data = await res.json();
-            renderAdminTable(data.players);
+    
+    const result = await apiRequest(`/api/admin/players/${username}`, {
+        method: "DELETE"
+    });
+    
+    if (result.ok) {
+        showToast("Player removed successfully");
+        const listResult = await apiRequest("/api/admin/players");
+        if (listResult.ok) {
+            renderAdminTable(listResult.data.players);
         }
-    } catch (err) {}
+    } else {
+        showToast(result.error);
+    }
 }
