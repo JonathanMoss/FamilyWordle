@@ -1,0 +1,21 @@
+[messages control]
+disable=
+    missing-docstring,
+    unused-argument,
+    duplicate-code,
+    import-outside-toplevel,
+    wrong-import-order,
+    consider-using-from-import,
+    unused-import,
+    trailing-whitespace,
+    line-too-long,
+    too-many-return-statements,
+    too-many-locals,
+    no-member,
+    too-many-lines,
+    redefined-outer-name,
+    unused-variable,
+    invalid-name,
+    global-statement,
+    use-dict-literal,
+    broad-exception-caught

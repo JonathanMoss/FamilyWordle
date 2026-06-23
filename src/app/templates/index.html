@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FamilyWordle - Fun Daily Challenges</title>
+    <meta name="description" content="A local Wordle game for our family. Play daily, test your skills, and check the standings in the league table!">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <!-- Header bar -->
+    <header>
+        <h1>FamilyWordle</h1>
+        <div class="nav-actions">
+            <!-- Signed-out actions -->
+            <button id="btn-show-login" class="btn-premium" onclick="showView('auth-view')">Sign In</button>
+            
+            <!-- Signed-in actions -->
+            <button id="btn-show-stats" class="btn-premium" style="display:none;" onclick="openStatsModal()">Stats</button>
+            <button id="btn-show-league" class="btn-premium" style="display:none;" onclick="openLeagueModal()">League</button>
+            <button id="btn-show-archive" class="btn-premium" style="display:none;" onclick="openArchiveModal()">Archive</button>
+            <button id="btn-show-admin" class="btn-premium" style="display:none;" onclick="openAdminModal()">Admin</button>
+            <button id="btn-logout" class="btn-premium" style="display:none;" onclick="handleLogout()">Sign Out</button>
+            
+            <!-- Help/Docs always visible -->
+            <button id="btn-show-help" class="btn-premium" onclick="openHelpModal()">Help</button>
+        </div>
+    </header>
+
+    <!-- Main View Section -->
+    <main>
+        
+        <!-- 1. Authentication View -->
+        <section id="auth-view" class="view-section active">
+            <div class="auth-card glass-panel">
+                <h2 id="auth-title">Sign In</h2>
+                <p id="auth-subtitle">Enter your name and PIN to play</p>
+                
+                <div class="form-group">
+                    <label for="auth-username">Player Name</label>
+                    <input type="text" id="auth-username" class="form-control-premium" placeholder="e.g. Jon" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="auth-pin">4-Digit PIN</label>
+                    <input type="password" id="auth-pin" class="form-control-premium" placeholder="••••" maxlength="4" required>
+                </div>
+                
+                <button id="btn-auth-submit" class="btn-primary-gradient" style="width:100%; margin-top:10px;" onclick="handleAuthSubmit()">Sign In</button>
+                
+                <div style="text-align:center; margin-top:16px; font-size:0.9rem;">
+                    <a id="btn-toggle-auth" href="#" style="color:#60a5fa; text-decoration:none;" onclick="toggleAuthMode(event)">Need an account? Register here</a>
+                </div>
+            </div>
+            
+            <!-- Safe Demo Mode Link -->
+            <div style="text-align:center; margin-top:20px;">
+                <button class="btn-premium" onclick="startDemoMode()">Try Demo Mode First</button>
+            </div>
+        </section>
+
+        <!-- 2. Daily Word / Gameplay View -->
+        <section id="game-view" class="view-section">
+            <div style="text-align:center; margin-bottom:12px;">
+                <span id="game-mode-banner" style="background:#1e293b; padding:4px 12px; border-radius:20px; font-size:0.85rem; font-weight:600; letter-spacing:1px; border: 1px solid var(--border-glass)">DAILY GAME</span>
+                <div id="game-timer" style="font-size:0.85rem; color:var(--text-secondary); margin-top:8px;"></div>
+            </div>
+
+            <!-- Game Board Grid -->
+            <div id="game-grid">
+                <!-- Javascript will render 6 rows of 5 tiles -->
+            </div>
+
+            <!-- Virtual Keyboard -->
+            <div id="keyboard">
+                <!-- Javascript will render QWERTY keys -->
+            </div>
+
+            <div style="text-align:center; margin-top:15px; display:none;" id="demo-exit-container">
+                <button class="btn-premium" onclick="exitDemoMode()">Exit Demo Mode</button>
+                <button class="btn-premium" onclick="resetDemoMode()" style="margin-left:8px;">Replay Demo</button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Notification Toast Banner -->
+    <div id="toast">Validation message</div>
+
+    <!-- Modals -->
+    
+    <!-- 1. Stats Modal -->
+    <div id="modal-stats" class="modal-overlay" onclick="closeModalOnOuterClick(event, 'modal-stats')">
+        <div class="modal-content glass-panel">
+            <button class="modal-close" onclick="closeModal('modal-stats')">&times;</button>
+            <h2 style="font-weight:800; margin-bottom:16px;">Your Stats</h2>
+            
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-val" id="stat-played">0</div>
+                    <div class="stat-lbl">Played</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val" id="stat-wins">0</div>
+                    <div class="stat-lbl">Won</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val" id="stat-win-pct">0%</div>
+                    <div class="stat-lbl">Win %</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-val" id="stat-streak">0</div>
+                    <div class="stat-lbl">Streak</div>
+                </div>
+            </div>
+            
+            <h3 style="font-weight:700; margin-top:24px; margin-bottom:12px;">Historical Attempts</h3>
+            <div id="stats-history-list" style="max-height:200px; overflow-y:auto; font-size:0.9rem;">
+                <!-- Filled by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. League Rankings Modal -->
+    <div id="modal-league" class="modal-overlay" onclick="closeModalOnOuterClick(event, 'modal-league')">
+        <div class="modal-content glass-panel" style="max-width:550px;">
+            <button class="modal-close" onclick="closeModal('modal-league')">&times;</button>
+            <h2 style="font-weight:800; margin-bottom:8px;">Family League Table</h2>
+            <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:16px;">Ranked by Wins, then Average attempts, then Streak</p>
+            
+            <div style="overflow-x:auto;">
+                <table class="league-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Player</th>
+                            <th>Played</th>
+                            <th>Wins</th>
+                            <th>Avg Turns</th>
+                            <th>Streak</th>
+                        </tr>
+                    </thead>
+                    <tbody id="league-table-body">
+                        <!-- Filled by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Archive Modal -->
+    <div id="modal-archive" class="modal-overlay" onclick="closeModalOnOuterClick(event, 'modal-archive')">
+        <div class="modal-content glass-panel">
+            <button class="modal-close" onclick="closeModal('modal-archive')">&times;</button>
+            <h2 style="font-weight:800; margin-bottom:16px;">Previous Daily Words</h2>
+            
+            <div id="archive-list" style="max-height:300px; overflow-y:auto;">
+                <!-- Filled by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Help / Online Documentation Modal -->
+    <div id="modal-help" class="modal-overlay" onclick="closeModalOnOuterClick(event, 'modal-help')">
+        <div class="modal-content glass-panel">
+            <button class="modal-close" onclick="closeModal('modal-help')">&times;</button>
+            <h2 style="font-weight:800; margin-bottom:16px;">How to Play</h2>
+            <div style="line-height:1.6; font-size:0.95rem;">
+                <p>Guess the daily word in 6 attempts. Each guess must be a valid 5-letter word.</p>
+                <br>
+                <p>The color of the tiles will change to show how close your guess was:</p>
+                <div style="margin:12px 0;">
+                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+                        <span style="background:var(--color-correct); width:32px; height:32px; border-radius:4px; display:inline-block;"></span>
+                        <span><strong>Green:</strong> The letter is in the correct spot.</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
+                        <span style="background:var(--color-present); width:32px; height:32px; border-radius:4px; display:inline-block;"></span>
+                        <span><strong>Yellow:</strong> The letter is in the word but wrong spot.</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <span style="background:var(--color-absent); width:32px; height:32px; border-radius:4px; display:inline-block;"></span>
+                        <span><strong>Grey:</strong> The letter is not in the word.</span>
+                    </div>
+                </div>
+                <br>
+                <p><strong>Rules:</strong></p>
+                <ul style="margin-left:20px; margin-top:8px;">
+                    <li>Only one daily word exists per day. All family members get the same word.</li>
+                    <li>A new game commences daily at <strong>00:01 Europe/London</strong> timezone.</li>
+                    <li>Streaks are calculated for consecutive completed games. Missing a day resets it!</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. User Administration Modal (Admin Only) -->
+    <div id="modal-admin" class="modal-overlay" onclick="closeModalOnOuterClick(event, 'modal-admin')">
+        <div class="modal-content glass-panel" style="max-width:550px;">
+            <button class="modal-close" onclick="closeModal('modal-admin')">&times;</button>
+            <h2 style="font-weight:800; margin-bottom:16px;">Player Administration</h2>
+            
+            <div style="overflow-x:auto;">
+                <table class="league-table">
+                    <thead>
+                        <tr>
+                            <th>Player Name</th>
+                            <th>Role</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="admin-table-body">
+                        <!-- Filled by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Client JS Script -->
+    <script src="{{ url_for('static', filename='js/game.js') }}"></script>
+</body>
+</html>
