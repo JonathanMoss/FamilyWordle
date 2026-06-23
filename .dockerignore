@@ -1,0 +1,11 @@
+venv/
+.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.pytest_cache/
+data/database.sqlite
+data/database.sqlite-journal
+.git/
+.gitignore

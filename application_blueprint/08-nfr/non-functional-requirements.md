@@ -32,7 +32,7 @@ Non-functional requirements define **how the system behaves and performs**, rath
 
 ## 4. Scalability
 
-- The system shall support at least **10,000 concurrent users** without performance degradation.
+- The system shall support at least **100 concurrent users** without performance degradation (optimized for local SQLite concurrency).
 - The system shall handle **peak traffic at daily reset (00:01)** without failure.
 
 ---
@@ -40,7 +40,8 @@ Non-functional requirements define **how the system behaves and performs**, rath
 ## 5. Security
 
 - The daily word shall not be exposed before completion of the game.
-- All user authentication shall prevent impersonation.
+- All user authentication shall prevent impersonation via a 4-digit PIN.
+- Player PINs must be securely hashed on the server using a strong cryptographic algorithm (e.g., bcrypt or PBKDF2) before storage.
 - Player data shall be securely stored and protected against unauthorized access.
 - All inputs shall be validated to prevent abuse or injection attacks.
 

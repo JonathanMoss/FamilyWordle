@@ -61,13 +61,15 @@ Client (Browser) → NGINX → Gunicorn → Flask → SQLite
 - Python 3.13
 - Flask
 - Gunicorn (WSGI server)
+- bcrypt (for secure PIN hashing)
 
 **Responsibilities**
 - Implement game rules and logic
 - Manage player sessions
-- Handle authentication
+- Handle authentication (PIN verification and secure session cookies)
 - Provide REST-style API endpoints
 - Calculate statistics and league rankings
+- Bootstrapping of admin users via CLI command
 
 **Design Principles**
 - Stateless request handling
@@ -104,8 +106,10 @@ Pydantic is used to:
 
 **Technology**
 - SQLite
+- SQLModel (Object-Relational Mapper combining SQLAlchemy and Pydantic)
 
 **Responsibilities**
+- Manage relational database connections and transactions
 - Store player accounts
 - Store game sessions and results
 - Maintain archive of daily words
@@ -114,6 +118,7 @@ Pydantic is used to:
 **Characteristics**
 - Embedded, file-based database
 - No separate database server required
+- Declarative table schemas using Python classes (SQLModel)
 
 **Constraints**
 - Single-writer concurrency model
@@ -215,6 +220,7 @@ Example flow for submitting a guess:
 - Implement health check endpoints
 
 ### Security
+- Secure cryptographic PIN hashing (using bcrypt or PBKDF2)
 - Enable HTTPS via reverse proxy
 - Add rate limiting
 
@@ -260,6 +266,50 @@ Example flow for submitting a guess:
 
 ---
 
-## 10. Conclusion
+## 10. Repository Layout
+
+To structure development, the repository follows a modular layout:
+
+```text
+FamilyWordle/
+├── application_blueprint/    # Specifications
+├── src/
+│   ├── app/
+│   │   ├── __init__.py       # Flask application factory
+│   │   ├── models.py         # SQLModel database/Pydantic models
+│   │   ├── services.py       # Core gameplay, dictionary, & word selection logic
+│   │   ├── routes/
+│   │   │   ├── auth.py       # Registration, login, & logout endpoints
+│   │   │   ├── game.py       # Daily game & demo game endpoints
+│   │   │   └── admin.py      # Player management endpoints (admin-only)
+│   │   ├── templates/        # HTML pages (index.html, admin.html)
+│   │   └── static/
+│   │       ├── css/          # style.css (custom styling & themes)
+│   │       └── js/           # game.js (GUI handlers & API integrations)
+│   └── tests/                # Pytest unit & Pytest-BDD scenarios
+├── data/
+│   ├── words.txt             # 5-letter permitted dictionary list
+│   └── database.sqlite       # Local SQLite database (mounted volume)
+├── Dockerfile                # Flask container setup
+├── docker-compose.yml        # Services orchestrator (Nginx proxy & Flask web app)
+├── nginx.conf                # Nginx reverse-proxy rules
+└── requirements.txt          # Python dependencies (Flask, SQLModel, bcrypt, etc.)
+```
+
+---
+
+## 11. Daily Word Selection Mechanism
+
+To avoid relying on system-level cron runners (which are prone to downtime errors or container re-initialization failures), the server employs a **lazy-loading check** for daily word generation:
+1. On any API query requiring daily game data (e.g., getting state, guessing, viewing stats), the request router checks if a row exists in the `DailyWord` table matching the current date (`YYYY-MM-DD` in the Europe/London timezone).
+2. If the row is absent, a transaction is executed:
+   - Select a random word from the `words.txt` permitted dictionary.
+   - Verify it does not already exist in the `DailyWord` historical records (ensuring no reuse).
+   - Write the word to the database for today's date.
+3. The server then fulfills the player's game query using the selected word.
+
+---
+
+## 12. Conclusion
 
 This architecture provides a robust foundation for a Wordle-style application. It balances simplicity with extensibility, allowing the system to operate efficiently at small scale while providing a clear path toward production-grade scalability.
