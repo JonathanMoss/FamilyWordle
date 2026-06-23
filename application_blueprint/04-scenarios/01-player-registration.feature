@@ -55,3 +55,18 @@ Feature: Player Registration
         | PIN         | 1234  |
       Then the account should not be created
       And I should see the validation message "Player Name already registered"
+
+    Scenario Outline: Registration fails when player name contains invalid symbols
+      Given I am on the registration page
+      When I register with:
+        | Field       | Value   |
+        | Player Name | <Name>  |
+        | PIN         | 1234    |
+      Then the account should not be created
+      And I should see the validation message "Player Name must be alphanumeric"
+
+      Examples:
+        | Name      |
+        | Jon@Home  |
+        | Jon.Moss  |
+        | Jon/Moss  |

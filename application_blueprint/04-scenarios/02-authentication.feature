@@ -53,3 +53,14 @@ Feature: Player Authentication
       Then I should no longer be signed in
       And I should be redirected to the sign in page
 
+    Scenario Outline: Sign in fails with missing credentials
+      Given I am on the sign in page
+      When I attempt to sign in with username "<Username>" and PIN "<PIN>"
+      Then I should not be signed in
+      And I should see the validation error message "Missing credentials"
+
+      Examples:
+        | Username | PIN  |
+        |          | 1234 |
+        | Jon      |      |
+

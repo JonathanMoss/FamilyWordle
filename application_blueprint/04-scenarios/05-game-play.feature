@@ -106,3 +106,18 @@ Feature: Game Play
       And I have submitted 3 guesses
       When I return to the daily game during the same day
       Then I should see my previous 3 guesses
+
+    Scenario: Player submits a guess not in the permitted word list
+      Given I am playing the daily game
+      When I submit the guess "XYZZY"
+      Then the guess should be rejected
+      And I should see the gameplay message "Word not in permitted word list"
+
+    Scenario: Player cannot submit a guess to a completed daily game
+      Given today's daily word is "SLATE"
+      And I am signed in as player "Jon"
+      And I am playing the daily game
+      When I submit the guess "SLATE"
+      And I submit the guess "CRANE"
+      Then the guess should be rejected
+      And I should see the gameplay message "Game finished"

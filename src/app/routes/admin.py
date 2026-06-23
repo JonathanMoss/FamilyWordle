@@ -60,7 +60,7 @@ def update_player(username):
         if not player or player.status == PlayerStatus.REMOVED.value:
             return jsonify({"error": "Player not found"}), 404
 
-        if new_username:
+        if new_username is not None:
             new_username = new_username.strip()
             if not new_username:
                 return jsonify({"error": "Invalid username"}), 400
