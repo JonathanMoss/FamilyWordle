@@ -9,10 +9,14 @@ from typing import List, Dict
 from zoneinfo import ZoneInfo
 import bcrypt
 from sqlmodel import Session, select
-from src.app.models import Player, DailyWord, DailyGame
+from src.app.models import Player, DailyWord, DailyGame, PlayerStatus, GameStatus
 
 # Timezone context
 LONDON_TZ = ZoneInfo("Europe/London")
+
+# Permitted words cache
+_permitted_words_set = None  # pylint: disable=invalid-name
+
 
 # PIN Hashing
 def hash_pin(pin: str) -> str:
@@ -74,8 +78,10 @@ def load_permitted_words(path: str = DICTIONARY_PATH) -> List[str]:
 
 def is_valid_word(word: str) -> bool:
     """Check if the word is in the permitted dictionary list."""
-    words = load_permitted_words()
-    return word.upper() in words
+    global _permitted_words_set  # pylint: disable=global-statement
+    if _permitted_words_set is None:
+        _permitted_words_set = set(load_permitted_words())
+    return word.upper() in _permitted_words_set
 
 # Lazy-loaded Word Selection
 def get_current_date_str() -> str:
@@ -138,10 +144,9 @@ def get_player_streak(session: Session, player_id: int) -> int:
     today_str = get_current_date_str()
     yesterday_str = (datetime.now(LONDON_TZ) - timedelta(days=1)).strftime("%Y-%m-%d")
 
-    # Query completed games sorted by date descending
     stmt = select(DailyGame).where(
         DailyGame.player_id == player_id,
-        DailyGame.status.in_(["won", "lost"])
+        DailyGame.status.in_([GameStatus.WON.value, GameStatus.LOST.value])
     ).order_by(DailyGame.date.desc())
 
     completed_games = session.exec(stmt).all()
@@ -175,7 +180,7 @@ def get_player_max_streak(session: Session, player_id: int) -> int:
     """Calculate the player's maximum historical streak of completed days."""
     stmt = select(DailyGame).where(
         DailyGame.player_id == player_id,
-        DailyGame.status.in_(["won", "lost"])
+        DailyGame.status.in_([GameStatus.WON.value, GameStatus.LOST.value])
     ).order_by(DailyGame.date.asc())
 
     completed_games = session.exec(stmt).all()
@@ -207,7 +212,7 @@ def get_league_table(session: Session) -> List[Dict]:
     2) Average attempts per completed game ascending (fewer is better)
     3) Current streak descending
     """
-    players_stmt = select(Player).where(Player.status == "active")
+    players_stmt = select(Player).where(Player.status == PlayerStatus.ACTIVE.value)
     players = session.exec(players_stmt).all()
 
     rankings = []
@@ -215,12 +220,12 @@ def get_league_table(session: Session) -> List[Dict]:
         # Completed games
         games_stmt = select(DailyGame).where(
             DailyGame.player_id == player.id,
-            DailyGame.status.in_(["won", "lost"])
+            DailyGame.status.in_([GameStatus.WON.value, GameStatus.LOST.value])
         )
         games = session.exec(games_stmt).all()
 
         games_played = len(games)
-        games_won = sum(1 for g in games if g.status == "won")
+        games_won = sum(1 for g in games if g.status == GameStatus.WON.value)
 
         # Average turns
         if games_played > 0:

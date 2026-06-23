@@ -8,7 +8,7 @@ from datetime import datetime, time, timedelta
 from flask import Blueprint, request, jsonify, session
 from sqlmodel import Session, select
 from src.app import get_engine
-from src.app.models import Player, DailyWord, DailyGame
+from src.app.models import Player, DailyWord, DailyGame, PlayerStatus, GameStatus
 from src.app.services import (
     evaluate_guess,
     get_or_create_daily_word,
@@ -45,7 +45,7 @@ def game_state():
         # Check active status
         stmt = select(Player).where(Player.id == user_id)
         player = db_session.exec(stmt).first()
-        if not player or player.status != "active":
+        if not player or player.status != PlayerStatus.ACTIVE.value:
             session.clear()
             return jsonify({"error": "Account inactive"}), 401
 
@@ -80,7 +80,7 @@ def game_state():
         }
 
         # Expose word if complete
-        if game.status in ["won", "lost", "expired"]:
+        if game.status in [GameStatus.WON.value, GameStatus.LOST.value, GameStatus.EXPIRED.value]:
             response["target_word"] = daily_word
 
         return jsonify(response), 200
@@ -113,7 +113,7 @@ def game_guess():
         # Check active status
         stmt = select(Player).where(Player.id == user_id)
         player = db_session.exec(stmt).first()
-        if not player or player.status != "active":
+        if not player or player.status != PlayerStatus.ACTIVE.value:
             session.clear()
             return jsonify({"error": "Account inactive"}), 401
 
@@ -136,7 +136,7 @@ def game_guess():
             game = DailyGame(
                 player_id=user_id,
                 date=today_str,
-                status="playing",
+                status=GameStatus.PLAYING.value,
                 attempts_used=0,
                 guesses_json="[]"
             )
@@ -147,7 +147,7 @@ def game_guess():
         if game.attempts_used >= 6:
             return jsonify({"error": "No guesses remaining (Game finished)"}), 400
 
-        if game.status in ["won", "lost", "expired"]:
+        if game.status in [GameStatus.WON.value, GameStatus.LOST.value, GameStatus.EXPIRED.value]:
             return jsonify({"error": "Game finished"}), 403
 
         # Add guess
@@ -165,9 +165,9 @@ def game_guess():
 
         # Status checks
         if guess == daily_word:
-            game.status = "won"
+            game.status = GameStatus.WON.value
         elif game.attempts_used >= 6:
-            game.status = "lost"
+            game.status = GameStatus.LOST.value
 
         db_session.add(game)
         db_session.commit()
@@ -178,7 +178,7 @@ def game_guess():
             "feedback": feedback,
             "attempts_used": game.attempts_used
         }
-        if game.status in ["won", "lost"]:
+        if game.status in [GameStatus.WON.value, GameStatus.LOST.value]:
             response["target_word"] = daily_word
 
         return jsonify(response), 200
@@ -192,7 +192,7 @@ def demo_state():
     demo_game = session.get("demo_game")
     if not demo_game:
         demo_game = {
-            "status": "playing",
+            "status": GameStatus.PLAYING.value,
             "attempts_used": 0,
             "guesses": []
         }
@@ -204,9 +204,9 @@ def demo_state():
 def demo_guess():
     """Submit a guess for the isolated demo mode session."""
     demo_game = session.get("demo_game")
-    if not demo_game or demo_game.get("status") != "playing":
+    if not demo_game or demo_game.get("status") != GameStatus.PLAYING.value:
         demo_game = {
-            "status": "playing",
+            "status": GameStatus.PLAYING.value,
             "attempts_used": 0,
             "guesses": []
         }
@@ -237,10 +237,10 @@ def demo_guess():
     demo_game["attempts_used"] += 1
 
     if guess == DEMO_TARGET:
-        demo_game["status"] = "won"
+        demo_game["status"] = GameStatus.WON.value
         demo_game["target_word"] = DEMO_TARGET
     elif demo_game["attempts_used"] >= 6:
-        demo_game["status"] = "lost"
+        demo_game["status"] = GameStatus.LOST.value
         demo_game["target_word"] = DEMO_TARGET
 
     session["demo_game"] = demo_game
@@ -250,7 +250,7 @@ def demo_guess():
         "feedback": feedback,
         "attempts_used": demo_game["attempts_used"]
     }
-    if demo_game["status"] in ["won", "lost"]:
+    if demo_game["status"] in [GameStatus.WON.value, GameStatus.LOST.value]:
         response["target_word"] = DEMO_TARGET
 
     return jsonify(response), 200
@@ -259,7 +259,7 @@ def demo_guess():
 def demo_reset():
     """Reset the isolated demo mode session state."""
     session["demo_game"] = {
-        "status": "playing",
+        "status": GameStatus.PLAYING.value,
         "attempts_used": 0,
         "guesses": []
     }
@@ -277,12 +277,12 @@ def stats():
     with Session(engine) as db_session:
         stmt = select(DailyGame).where(
             DailyGame.player_id == user_id,
-            DailyGame.status.in_(["won", "lost"])
+            DailyGame.status.in_([GameStatus.WON.value, GameStatus.LOST.value])
         ).order_by(DailyGame.date.desc())
         games = db_session.exec(stmt).all()
 
         games_played = len(games)
-        games_won = sum(1 for g in games if g.status == "won")
+        games_won = sum(1 for g in games if g.status == GameStatus.WON.value)
         win_percentage = (
             (games_won / games_played * 100.0) if games_played > 0 else 0.0
         )
@@ -303,7 +303,7 @@ def stats():
                 "date": g.date,
                 "word": word,
                 "attempts": g.attempts_used,
-                "result": "win" if g.status == "won" else "loss"
+                "result": "win" if g.status == GameStatus.WON.value else "loss"
             })
 
         return jsonify({

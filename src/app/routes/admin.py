@@ -6,13 +6,13 @@ Handles managing player lists, status updates, and soft removal.
 from flask import Blueprint, request, jsonify, session
 from sqlmodel import Session, select
 from src.app import get_engine
-from src.app.models import Player
+from src.app.models import Player, PlayerRole, PlayerStatus
 
 admin_bp = Blueprint("admin", __name__)
 
 def require_admin():
     """Verify the signed-in user is an administrator."""
-    if session.get("role") != "admin":
+    if session.get("role") != PlayerRole.ADMIN.value:
         return False
     return True
 
@@ -27,7 +27,7 @@ def list_players():
     with Session(engine) as db_session:
         # Fetch active and disabled players (exclude removed status)
 
-        stmt = select(Player).where(Player.status != "removed")
+        stmt = select(Player).where(Player.status != PlayerStatus.REMOVED.value)
         players = db_session.exec(stmt).all()
 
         result = [
@@ -57,7 +57,7 @@ def update_player(username):
         stmt = select(Player).where(Player.username == username)
         player = db_session.exec(stmt).first()
 
-        if not player or player.status == "removed":
+        if not player or player.status == PlayerStatus.REMOVED.value:
             return jsonify({"error": "Player not found"}), 404
 
         if new_username:
@@ -71,12 +71,16 @@ def update_player(username):
             player.username = new_username
 
         if new_status:
-            if new_status not in ["active", "disabled", "removed"]:
+            if new_status not in [
+                PlayerStatus.ACTIVE.value,
+                PlayerStatus.DISABLED.value,
+                PlayerStatus.REMOVED.value,
+            ]:
                 return jsonify({"error": "Invalid status"}), 400
             player.status = new_status
 
         if new_role:
-            if new_role not in ["player", "admin"]:
+            if new_role not in [PlayerRole.PLAYER.value, PlayerRole.ADMIN.value]:
                 return jsonify({"error": "Invalid role"}), 400
             player.role = new_role
 
@@ -96,10 +100,10 @@ def remove_player(username):
         stmt = select(Player).where(Player.username == username)
         player = db_session.exec(stmt).first()
 
-        if not player or player.status == "removed":
+        if not player or player.status == PlayerStatus.REMOVED.value:
             return jsonify({"error": "Player not found"}), 404
 
-        player.status = "removed"
+        player.status = PlayerStatus.REMOVED.value
         db_session.add(player)
         db_session.commit()
 
