@@ -18,8 +18,14 @@ class Player(SQLModel, table=True):
         regex="^[a-zA-Z0-9_-]+$" # Alphanumeric, underscores, and hyphens only
     )
     pin_hash: str = Field(description="Securely hashed PIN")
-    role: str = Field(default="player", description="Role: 'player' or 'admin'")
-    status: str = Field(default="active", description="Status: 'active', 'disabled', or 'removed'")
+    role: str = Field(
+        default=PlayerRole.PLAYER.value,
+        description="Role: 'player' or 'admin' (mapped via PlayerRole Enum)"
+    )
+    status: str = Field(
+        default=PlayerStatus.ACTIVE.value,
+        description="Status: 'active', 'disabled', or 'removed' (mapped via PlayerStatus Enum)"
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow)
 ```
 
@@ -53,7 +59,10 @@ class DailyGame(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     player_id: int = Field(foreign_key="player.id", index=True)
     date: str = Field(index=True, description="Calendar date in YYYY-MM-DD format")
-    status: str = Field(default="playing", description="Status: 'playing', 'won', 'lost', or 'expired'")
+    status: str = Field(
+        default=GameStatus.PLAYING.value,
+        description="Status: 'playing', 'won', 'lost', or 'expired' (mapped via GameStatus Enum)"
+    )
     attempts_used: int = Field(default=0, ge=0, le=6)
     
     # Store attempts list as JSON string:
