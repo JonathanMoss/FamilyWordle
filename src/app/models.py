@@ -4,8 +4,27 @@ Defines Player, DailyWord, and DailyGame tables.
 """
 # pylint: disable=too-few-public-methods
 from datetime import datetime
+from enum import Enum
 from typing import Optional
 from sqlmodel import SQLModel, Field
+
+class PlayerRole(str, Enum):
+    """Possible player roles."""
+    PLAYER = "player"
+    ADMIN = "admin"
+
+class PlayerStatus(str, Enum):
+    """Possible player account statuses."""
+    ACTIVE = "active"
+    DISABLED = "disabled"
+    REMOVED = "removed"
+
+class GameStatus(str, Enum):
+    """Possible daily game statuses."""
+    PLAYING = "playing"
+    WON = "won"
+    LOST = "lost"
+    EXPIRED = "expired"
 
 class Player(SQLModel, table=True):
     """
@@ -14,8 +33,11 @@ class Player(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     username: str = Field(unique=True, index=True, min_length=1, max_length=20)
     pin_hash: str = Field(description="Securely hashed PIN")
-    role: str = Field(default="player", description="Role: 'player' or 'admin'")
-    status: str = Field(default="active", description="Status: 'active', 'disabled', or 'removed'")
+    role: str = Field(default=PlayerRole.PLAYER.value, description="Role: 'player' or 'admin'")
+    status: str = Field(
+        default=PlayerStatus.ACTIVE.value,
+        description="Status: 'active', 'disabled', or 'removed'"
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 class DailyWord(SQLModel, table=True):
@@ -34,10 +56,11 @@ class DailyGame(SQLModel, table=True):
     player_id: int = Field(foreign_key="player.id", index=True)
     date: str = Field(index=True, description="Calendar date in YYYY-MM-DD format")
     status: str = Field(
-        default="playing",
+        default=GameStatus.PLAYING.value,
         description="Status: 'playing', 'won', 'lost', or 'expired'"
     )
     attempts_used: int = Field(default=0, ge=0, le=6)
+
 
     # Serialized JSON list of guesses and feedback dictionaries
     # Format: [{"word": "SLATE", "feedback": [...], "timestamp": "..."}]

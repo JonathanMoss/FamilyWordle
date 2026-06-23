@@ -6,7 +6,7 @@ Handles player registration, login, and logout.
 from flask import Blueprint, request, jsonify, session
 from sqlmodel import Session, select
 from src.app import get_engine
-from src.app.models import Player
+from src.app.models import Player, PlayerRole, PlayerStatus
 from src.app.services import hash_pin, verify_pin
 
 auth_bp = Blueprint("auth", __name__)
@@ -56,7 +56,7 @@ def register():
         existing = db_session.exec(stmt).first()
         if existing:
             # Check status of existing player
-            if existing.status == "removed":
+            if existing.status == PlayerStatus.REMOVED.value:
                 # If removed, we can recycle or restore, but we just raise Conflict.
                 pass
             return jsonify({"error": "Player Name already registered (User already exists)"}), 409
@@ -65,8 +65,8 @@ def register():
         player = Player(
             username=username,
             pin_hash=hashed,
-            role="player",
-            status="active"
+            role=PlayerRole.PLAYER.value,
+            status=PlayerStatus.ACTIVE.value
         )
         db_session.add(player)
         db_session.commit()
@@ -91,10 +91,10 @@ def login():
         stmt = select(Player).where(Player.username == username)
         player = db_session.exec(stmt).first()
 
-        if not player or player.status == "removed":
+        if not player or player.status == PlayerStatus.REMOVED.value:
             return jsonify({"error": "User does not exist"}), 401
 
-        if player.status == "disabled":
+        if player.status == PlayerStatus.DISABLED.value:
             return jsonify({"error": "Account disabled"}), 401
 
         if not verify_pin(pin, player.pin_hash):

@@ -8,7 +8,7 @@ from typing import Optional
 import click
 from flask import Flask, render_template, session
 from sqlmodel import SQLModel, create_engine, Session, select
-from src.app.models import Player
+from src.app.models import Player, PlayerRole, PlayerStatus
 from src.app.services import hash_pin
 
 # SQLModel DB engine
@@ -66,8 +66,8 @@ def create_app(db_uri: Optional[str] = None) -> Flask:
                     admin_user = Player(
                         username=admin_username,
                         pin_hash=hashed,
-                        role="admin",
-                        status="active"
+                        role=PlayerRole.ADMIN.value,
+                        status=PlayerStatus.ACTIVE.value
                     )
                     db_session.add(admin_user)
                     db_session.commit()
@@ -123,8 +123,8 @@ def create_app(db_uri: Optional[str] = None) -> Flask:
             admin_user = Player(
                 username=username,
                 pin_hash=hashed,
-                role="admin",
-                status="active"
+                role=PlayerRole.ADMIN.value,
+                status=PlayerStatus.ACTIVE.value
             )
             db_session.add(admin_user)
             db_session.commit()
