@@ -1,9 +1,7 @@
-import os
+# pylint: disable=missing-docstring,redefined-outer-name,unused-argument,import-outside-toplevel,consider-using-from-import
 import pytest
-from sqlmodel import SQLModel, Session, select
+from sqlmodel import Session
 from src.app import create_app, get_engine
-from src.app.models import Player
-from src.app.services import hash_pin
 
 @pytest.fixture(name="app")
 def app_fixture():
@@ -16,14 +14,14 @@ def app_fixture():
         # Flask needs a static secret key for testing session cookies
         "SECRET_KEY": "test-secret-key"
     })
-    
+
     # Yield app context
     with app.app_context():
         yield app
-        
-    # Reset db_engine global to avoid database caching across tests
+
+    # Reset DB_ENGINE global to avoid database caching across tests
     import src.app as app_module
-    app_module.db_engine = None
+    app_module.DB_ENGINE = None
 
 @pytest.fixture(name="client")
 def client_fixture(app):

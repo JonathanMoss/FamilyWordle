@@ -1,6 +1,10 @@
+"""
+Game routes blueprint.
+Handles gameplay states, guesses, demo mode, stats, and archive.
+"""
+# pylint: disable=too-many-return-statements,too-many-locals
 import json
 from datetime import datetime, time, timedelta
-from zoneinfo import ZoneInfo
 from flask import Blueprint, request, jsonify, session
 from sqlmodel import Session, select
 from src.app import get_engine
@@ -30,11 +34,12 @@ def get_remaining_seconds() -> int:
 
 @game_bp.route("/game/state", methods=["GET"])
 def game_state():
+    """Retrieve the current daily game state for the signed-in player."""
     username = session.get("username")
     user_id = session.get("user_id")
     if not username or not user_id:
         return jsonify({"error": "Authentication required"}), 401
-        
+
     engine = get_engine()
     with Session(engine) as db_session:
         # Check active status
@@ -43,19 +48,19 @@ def game_state():
         if not player or player.status != "active":
             session.clear()
             return jsonify({"error": "Account inactive"}), 401
-            
+
         today_str = get_current_date_str()
         daily_word = get_or_create_daily_word(db_session)
-        
+
         # Query player's daily game
         stmt = select(DailyGame).where(
             DailyGame.player_id == user_id,
             DailyGame.date == today_str
         )
         game = db_session.exec(stmt).first()
-        
+
         remaining_seconds = get_remaining_seconds()
-        
+
         if not game:
             return jsonify({
                 "status": "not_started",
@@ -64,7 +69,7 @@ def game_state():
                 "guesses": [],
                 "remaining_seconds": remaining_seconds
             }), 200
-            
+
         guesses = json.loads(game.guesses_json)
         response = {
             "status": game.status,
@@ -73,29 +78,36 @@ def game_state():
             "guesses": guesses,
             "remaining_seconds": remaining_seconds
         }
-        
+
         # Expose word if complete
         if game.status in ["won", "lost", "expired"]:
             response["target_word"] = daily_word
-            
+
         return jsonify(response), 200
 
 @game_bp.route("/game/guess", methods=["POST"])
 def game_guess():
+    """Submit a guess for the daily game session."""
     username = session.get("username")
     user_id = session.get("user_id")
     if not username or not user_id:
         return jsonify({"error": "Authentication required"}), 401
-        
+
     data = request.get_json() or {}
     guess = data.get("guess", "").strip().upper()
-    
+
     if len(guess) != 5 or not guess.isalpha():
-        return jsonify({"error": "Invalid guess", "details": "Guess must be exactly 5 letters"}), 400
-        
+        return jsonify({
+            "error": "Invalid guess",
+            "details": "Guess must be exactly 5 letters"
+        }), 400
+
     if not is_valid_word(guess):
-        return jsonify({"error": "Invalid guess", "details": "Word not in permitted word list"}), 400
-        
+        return jsonify({
+            "error": "Invalid guess",
+            "details": "Word not in permitted word list"
+        }), 400
+
     engine = get_engine()
     with Session(engine) as db_session:
         # Check active status
@@ -104,22 +116,22 @@ def game_guess():
         if not player or player.status != "active":
             session.clear()
             return jsonify({"error": "Account inactive"}), 401
-            
+
         today_str = get_current_date_str()
         daily_word = get_or_create_daily_word(db_session)
-        
+
         # Check if game expired (checked on lazy load)
         remaining = get_remaining_seconds()
         if remaining <= 0:
             return jsonify({"error": "Game finished"}), 403
-            
+
         # Get or create daily game
         stmt = select(DailyGame).where(
             DailyGame.player_id == user_id,
             DailyGame.date == today_str
         )
         game = db_session.exec(stmt).first()
-        
+
         if not game:
             game = DailyGame(
                 player_id=user_id,
@@ -131,13 +143,13 @@ def game_guess():
             db_session.add(game)
             db_session.commit()
             db_session.refresh(game)
-            
+
         if game.attempts_used >= 6:
             return jsonify({"error": "No guesses remaining (Game finished)"}), 400
-            
+
         if game.status in ["won", "lost", "expired"]:
             return jsonify({"error": "Game finished"}), 403
-            
+
         # Add guess
         feedback = evaluate_guess(guess, daily_word)
         guesses = json.loads(game.guesses_json)
@@ -146,21 +158,21 @@ def game_guess():
             "feedback": feedback,
             "timestamp": datetime.now(LONDON_TZ).isoformat()
         })
-        
+
         game.attempts_used += 1
         game.guesses_json = json.dumps(guesses)
         game.updated_at = datetime.utcnow()
-        
+
         # Status checks
         if guess == daily_word:
             game.status = "won"
         elif game.attempts_used >= 6:
             game.status = "lost"
-            
+
         db_session.add(game)
         db_session.commit()
         db_session.refresh(game)
-        
+
         response = {
             "status": game.status,
             "feedback": feedback,
@@ -168,7 +180,7 @@ def game_guess():
         }
         if game.status in ["won", "lost"]:
             response["target_word"] = daily_word
-            
+
         return jsonify(response), 200
 
 # Isolated Demo Mode Logic (Stored in session)
@@ -176,6 +188,7 @@ DEMO_TARGET = "LEARN"
 
 @game_bp.route("/game/demo/state", methods=["GET"])
 def demo_state():
+    """Retrieve the current state of the isolated demo mode session."""
     demo_game = session.get("demo_game")
     if not demo_game:
         demo_game = {
@@ -184,11 +197,12 @@ def demo_state():
             "guesses": []
         }
         session["demo_game"] = demo_game
-        
+
     return jsonify(demo_game), 200
 
 @game_bp.route("/game/demo/guess", methods=["POST"])
 def demo_guess():
+    """Submit a guess for the isolated demo mode session."""
     demo_game = session.get("demo_game")
     if not demo_game or demo_game.get("status") != "playing":
         demo_game = {
@@ -196,35 +210,41 @@ def demo_guess():
             "attempts_used": 0,
             "guesses": []
         }
-        
+
     data = request.get_json() or {}
     guess = data.get("guess", "").strip().upper()
-    
+
     if len(guess) != 5 or not guess.isalpha():
-        return jsonify({"error": "Invalid guess", "details": "Guess must be exactly 5 letters"}), 400
-        
+        return jsonify({
+            "error": "Invalid guess",
+            "details": "Guess must be exactly 5 letters"
+        }), 400
+
     if not is_valid_word(guess):
-        return jsonify({"error": "Invalid guess", "details": "Word not in permitted word list"}), 400
-        
+        return jsonify({
+            "error": "Invalid guess",
+            "details": "Word not in permitted word list"
+        }), 400
+
     if demo_game["attempts_used"] >= 6:
         return jsonify({"error": "No guesses remaining"}), 400
-        
+
     feedback = evaluate_guess(guess, DEMO_TARGET)
     demo_game["guesses"].append({
         "word": guess,
         "feedback": feedback
     })
     demo_game["attempts_used"] += 1
-    
+
     if guess == DEMO_TARGET:
         demo_game["status"] = "won"
         demo_game["target_word"] = DEMO_TARGET
     elif demo_game["attempts_used"] >= 6:
         demo_game["status"] = "lost"
         demo_game["target_word"] = DEMO_TARGET
-        
+
     session["demo_game"] = demo_game
-    
+
     response = {
         "status": demo_game["status"],
         "feedback": feedback,
@@ -232,11 +252,12 @@ def demo_guess():
     }
     if demo_game["status"] in ["won", "lost"]:
         response["target_word"] = DEMO_TARGET
-        
+
     return jsonify(response), 200
 
 @game_bp.route("/game/demo/reset", methods=["POST"])
 def demo_reset():
+    """Reset the isolated demo mode session state."""
     session["demo_game"] = {
         "status": "playing",
         "attempts_used": 0,
@@ -246,11 +267,12 @@ def demo_reset():
 
 @game_bp.route("/stats", methods=["GET"])
 def stats():
+    """Retrieve gameplay statistics and history for the signed-in player."""
     username = session.get("username")
     user_id = session.get("user_id")
     if not username or not user_id:
         return jsonify({"error": "Authentication required"}), 401
-        
+
     engine = get_engine()
     with Session(engine) as db_session:
         stmt = select(DailyGame).where(
@@ -258,15 +280,20 @@ def stats():
             DailyGame.status.in_(["won", "lost"])
         ).order_by(DailyGame.date.desc())
         games = db_session.exec(stmt).all()
-        
+
         games_played = len(games)
         games_won = sum(1 for g in games if g.status == "won")
-        win_percentage = (games_won / games_played * 100.0) if games_played > 0 else 0.0
-        avg_attempts = (sum(g.attempts_used for g in games) / games_played) if games_played > 0 else 0.0
-        
+        win_percentage = (
+            (games_won / games_played * 100.0) if games_played > 0 else 0.0
+        )
+        avg_attempts = (
+            (sum(g.attempts_used for g in games) / games_played)
+            if games_played > 0 else 0.0
+        )
+
         current_streak = get_player_streak(db_session, user_id)
         max_streak = get_player_max_streak(db_session, user_id)
-        
+
         history = []
         for g in games:
             # Join target word
@@ -278,7 +305,7 @@ def stats():
                 "attempts": g.attempts_used,
                 "result": "win" if g.status == "won" else "loss"
             })
-            
+
         return jsonify({
             "games_played": games_played,
             "games_won": games_won,
@@ -291,10 +318,11 @@ def stats():
 
 @game_bp.route("/stats/league", methods=["GET"])
 def league():
+    """Retrieve the sorted rankings table for all active players."""
     # Allow signed-in players to see the league table
     if not session.get("username"):
         return jsonify({"error": "Authentication required"}), 401
-        
+
     engine = get_engine()
     with Session(engine) as db_session:
         table = get_league_table(db_session)
@@ -302,12 +330,13 @@ def league():
 
 @game_bp.route("/archive", methods=["GET"])
 def archive():
+    """Retrieve the historical archive of selected daily words (excluding today)."""
     today_str = get_current_date_str()
     engine = get_engine()
     with Session(engine) as db_session:
         # Exclude today's word from archive
         stmt = select(DailyWord).where(DailyWord.date != today_str).order_by(DailyWord.date.desc())
         words = db_session.exec(stmt).all()
-        
+
         result = [{"date": w.date, "word": w.word} for w in words]
         return jsonify({"archive": result}), 200

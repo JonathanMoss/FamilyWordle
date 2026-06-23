@@ -1,11 +1,18 @@
+# pylint: disable=missing-docstring,redefined-outer-name,unused-argument,too-many-lines,import-outside-toplevel
 import json
-import pytest
 from datetime import datetime, timedelta
+
+import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
-from sqlmodel import Session, select
-from src.app import get_engine
+from sqlmodel import select
+
 from src.app.models import Player, DailyWord, DailyGame
-from src.app.services import hash_pin, get_current_date_str, get_or_create_daily_word, LONDON_TZ
+from src.app.services import (
+    hash_pin,
+    get_current_date_str,
+    get_or_create_daily_word,
+    LONDON_TZ
+)
 
 # Bind BDD scenarios
 scenarios("../../application_blueprint/04-scenarios")
@@ -32,7 +39,8 @@ def _get_hashes(datatable, example_params=None):
     for row in datatable[1:]:
         new_row = []
         for val in row:
-            if example_params and isinstance(val, str) and val.startswith("<") and val.endswith(">"):
+            is_tmpl = isinstance(val, str) and val.startswith("<") and val.endswith(">")
+            if example_params and is_tmpl:
                 key = val[1:-1]
                 if key in example_params:
                     val = example_params[key]
@@ -48,7 +56,12 @@ def _ensure_logged_in(client, db_session):
                 stmt = select(Player).where(Player.username == "DefaultPlayer")
                 player = db_session.exec(stmt).first()
                 if not player:
-                    player = Player(username="DefaultPlayer", pin_hash=hash_pin("1234"), role="player", status="active")
+                    player = Player(
+                        username="DefaultPlayer",
+                        pin_hash=hash_pin("1234"),
+                        role="player",
+                        status="active"
+                    )
                     db_session.add(player)
                     db_session.commit()
                     db_session.refresh(player)
@@ -122,11 +135,16 @@ def signed_in_as(client, db_session, username):
     stmt = select(Player).where(Player.username == username)
     player = db_session.exec(stmt).first()
     if not player:
-        player = Player(username=username, pin_hash=hash_pin("1234"), role="player", status="active")
+        player = Player(
+            username=username,
+            pin_hash=hash_pin("1234"),
+            role="player",
+            status="active"
+        )
         db_session.add(player)
         db_session.commit()
         db_session.refresh(player)
-        
+
     with client.session_transaction() as sess:
         sess["user_id"] = player.id
         sess["username"] = player.username
@@ -138,11 +156,16 @@ def signed_in_as_admin(client, db_session):
     stmt = select(Player).where(Player.username == "admin_user")
     admin = db_session.exec(stmt).first()
     if not admin:
-        admin = Player(username="admin_user", pin_hash=hash_pin("1234"), role="admin", status="active")
+        admin = Player(
+            username="admin_user",
+            pin_hash=hash_pin("1234"),
+            role="admin",
+            status="active"
+        )
         db_session.add(admin)
         db_session.commit()
         db_session.refresh(admin)
-        
+
     with client.session_transaction() as sess:
         sess["user_id"] = admin.id
         sess["username"] = admin.username
@@ -243,8 +266,9 @@ def submitted_n_guesses(client, db_session, count):
     today = get_current_date_str()
     player = test_state["current_player"]
     guesses = [{"word": "SLATE", "feedback": ["absent"]*5} for _ in range(count)]
-    
-    # Clear existing game if exists to avoid unique constraint issues or duplicate games in the same scenario
+
+    # Clear existing game if exists to avoid unique constraint issues
+    # or duplicate games in the same scenario
     stmt = select(DailyGame).where(DailyGame.player_id == player.id, DailyGame.date == today)
     existing_game = db_session.exec(stmt).first()
     if existing_game:
@@ -277,7 +301,7 @@ def players_exist_table(db_session, datatable):
         status = row["Status"].lower()
         if status == "registered":
             status = "active"
-        
+
         stmt = select(Player).where(Player.username == username)
         p = db_session.exec(stmt).first()
         if p:
@@ -297,17 +321,22 @@ def player_stats_exist_table(db_session, datatable):
     for row in hashes:
         username = row["Player Name"]
         wins = int(row["Games Won"])
-        avg_attempts = float(row.get("Average Turns", 4.0))
-        streak = int(row.get("Consecutive Days", 0))
-        
+        _avg_attempts = float(row.get("Average Turns", 4.0))
+        _streak = int(row.get("Consecutive Days", 0))
+
         stmt = select(Player).where(Player.username == username)
         p = db_session.exec(stmt).first()
         if not p:
-            p = Player(username=username, pin_hash=hash_pin("1234"), role="player", status="active")
+            p = Player(
+                username=username,
+                pin_hash=hash_pin("1234"),
+                role="player",
+                status="active"
+            )
             db_session.add(p)
             db_session.commit()
             db_session.refresh(p)
-            
+
         for i in range(wins):
             date_str = (datetime.now() - timedelta(days=i+1)).strftime("%Y-%m-%d")
             game = DailyGame(
@@ -329,12 +358,12 @@ def registered_player_stats(db_session, username, datatable):
         db_session.add(p)
         db_session.commit()
         db_session.refresh(p)
-        
+
     hashes = _get_hashes(datatable)
     for row in hashes:
         played = int(row["Games Played"])
         wins = int(row["Games Won"])
-        
+
         for i in range(played):
             date_str = (datetime.now() - timedelta(days=i+1)).strftime("%Y-%m-%d")
             status = "won" if i < wins else "lost"
@@ -354,7 +383,7 @@ def player_completes_game(client, db_session, username):
     signed_in_as(client, db_session, username)
     today = get_current_date_str()
     player = test_state["current_player"]
-    
+
     game = DailyGame(
         player_id=player.id,
         date=today,
@@ -403,7 +432,7 @@ def today_game_active():
 def player_completed_previous(db_session, username):
     stmt = select(Player).where(Player.username == username)
     p = db_session.exec(stmt).first()
-    
+
     # Create a completed game on 2026-06-21
     game = DailyGame(
         player_id=p.id,
@@ -921,7 +950,7 @@ def play_another_demo():
 @then("the demo game should not appear in my statistics")
 def demo_no_stats(client):
     res = client.get("/api/stats")
-    assert len(res.json["history"]) == 0
+    assert not res.json["history"]
 
 @then("I should still be able to play the current daily game")
 def daily_game_playable(client):

@@ -14,12 +14,20 @@ fi
 
 # Run pylint
 echo "1. Running pylint on src/..."
-pylint src/
+if [ -f ".venv/bin/pylint" ]; then
+    .venv/bin/pylint src/
+else
+    pylint src/
+fi
 PYLINT_EXIT=$?
 
 # Run pytest (runs both unit and BDD tests)
 echo "2. Running pytest..."
-pytest
+if /usr/bin/python3 -c "import sqlite3" &>/dev/null; then
+    /usr/bin/python3 -m pytest
+else
+    pytest
+fi
 PYTEST_EXIT=$?
 
 # Check statuses
