@@ -2,6 +2,8 @@
 # run_checks.sh
 # Validation script for code checks before git push
 
+export PYTHONPATH=.
+
 echo "🔍 Running code quality checks..."
 
 # Check if src folder exists
