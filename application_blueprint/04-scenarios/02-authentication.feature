@@ -3,33 +3,40 @@ Feature: Player Authentication
   I want to sign in and sign out
   So that I can securely access my account
 
-  Rule: Only valid and active player accounts can sign in
+  Rule: Only valid and active player accounts can sign in with their correct PIN
 
     Scenario: Registered player signs in successfully
-      Given a registered player "Jon" exists
+      Given a registered player "Jon" with PIN "1234" exists
       And I am on the sign in page
-      When I sign in as "Jon"
+      When I sign in as "Jon" with PIN "1234"
       Then I should be signed in
       And I should see the home page
 
     Scenario: Sign in fails for an unknown player
       Given no registered player "Ghost" exists
       And I am on the sign in page
-      When I sign in as "Ghost"
+      When I sign in as "Ghost" with PIN "1234"
       Then I should not be signed in
       And I should see the authentication message "User does not exist"
 
-    Scenario: Sign in fails for a disabled player
-      Given a disabled player "Jon" exists
+    Scenario: Sign in fails with incorrect PIN
+      Given a registered player "Jon" with PIN "1234" exists
       And I am on the sign in page
-      When I sign in as "Jon"
+      When I sign in as "Jon" with PIN "9999"
+      Then I should not be signed in
+      And I should see the authentication message "Incorrect PIN"
+
+    Scenario: Sign in fails for a disabled player
+      Given a disabled player "Jon" with PIN "1234" exists
+      And I am on the sign in page
+      When I sign in as "Jon" with PIN "1234"
       Then I should not be signed in
       And I should see the authentication message "Account disabled"
 
     Scenario: Removed player cannot sign in
-      Given a removed player "Jon" exists
+      Given a removed player "Jon" with PIN "1234" exists
       And I am on the sign in page
-      When I sign in as "Jon"
+      When I sign in as "Jon" with PIN "1234"
       Then I should not be signed in
       And I should see the authentication message "User does not exist"
 

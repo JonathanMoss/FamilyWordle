@@ -2,21 +2,23 @@ Player States:
 Unregistered -> Registered -> Not Playing -> Playing
 
 Player Transitions:
-
-- Unregistred -> Registered: Player undertakes simple registration
-- Not Playing -> Playing: Player access the application and player enters current days game
+- Unregistered -> Registered: Player registers with a unique nickname and a 4-digit PIN.
+- Not Playing -> Playing: Player authenticates using nickname and PIN, and accesses the current day's game dashboard.
+- Playing -> Not Playing: Player signs out or their session expires.
 
 Daily Word States:
 Selected -> In Play -> Archived
 
 Daily Word Transitions:
-- Selected -> In Play: The 5 letter word is selected and used in a daily game
-- In Play -> Archived: When the game ends, the word is archived
+- Selected -> In Play: The daily word is selected and set active at 00:01 Europe/London.
+- In Play -> Archived: The active game window closes at 00:01 Europe/London the following day, and the word is archived.
 
 Game States:
-Started -> In Play -> End
+Not Started -> In Play -> Ended (Win / Loss / Expired)
 
-Transitions:
-- Started -> In Play: A new game commences
-- In Play -> End: At 0001 Hrs the current game ends.
+Game Transitions:
+- Not Started -> In Play: The player opens the game dashboard and submits their first valid guess.
+- In Play -> Ended (Win): The player submits a guess that matches the daily word within 6 attempts.
+- In Play -> Ended (Loss): The player submits a 6th incorrect guess.
+- Not Started / In Play -> Ended (Expired): The system time reaches 00:01 Europe/London of the next day, closing the game.
 
