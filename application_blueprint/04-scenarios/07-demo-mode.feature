@@ -48,3 +48,9 @@ Feature: Demo Mode
       Given I complete the demo game
       When I start the daily game
       Then I should still be able to play the current daily game
+
+    Scenario: Player loses the daily game in demo mode
+      Given I am playing the demo game
+      When I submit 6 incorrect guesses in demo mode
+      Then my demo game status should be "lost"
+      And the target word should be revealed as "LEARN"

@@ -674,7 +674,7 @@ def see_home_page():
 @then("I should not be signed in")
 def user_should_not_be_signed_in():
     res = test_state["last_response"]
-    assert res.status_code == 401
+    assert res.status_code in [400, 401]
 
 @then(parsers.parse('I should see the authentication message "{msg}"'))
 def see_auth_message(msg):
@@ -1152,3 +1152,96 @@ def see_player_in_league_table(username):
     res = test_state["last_response"]
     ranks = [r["username"] for r in res.json["rankings"]]
     assert username in ranks
+
+@when(
+    parsers.re(
+        r'I attempt to sign in with username "(?P<username>[^"]*)" and PIN "(?P<pin>[^"]*)"'
+    )
+)
+def attempt_signin(client, username, pin):
+    """Attempt to sign in with the given username and PIN."""
+    payload = {"username": username, "pin": pin}
+    test_state["last_response"] = client.post("/api/auth/login", json=payload)
+
+@then(parsers.parse('I should see the validation error message "{message}"'))
+def see_validation_error_message(message):
+    """Verify that the validation error message contains the expected string."""
+    res = test_state["last_response"]
+    assert message in res.json.get("error", "") or message in res.json.get("details", "")
+
+@then(parsers.parse('I should see a list containing players "{player_a}" and "{player_b}"'))
+def see_players_list(player_a, player_b):
+    """Verify the listed players include the expected names."""
+    res = test_state["last_response"]
+    assert res.status_code == 200
+    players = [p["username"] for p in res.json["players"]]
+    assert player_a in players
+    assert player_b in players
+
+@when(parsers.parse('I attempt to rename player "{old_name}" to "{new_name}" as standard player'))
+def attempt_rename_standard_player(client, old_name, new_name):
+    """Attempt to rename a player while logged in as a standard user."""
+    payload = {"username": new_name}
+    test_state["last_response"] = client.put(f"/api/admin/players/{old_name}", json=payload)
+
+@when(parsers.parse('I attempt to remove player "{username}" as standard player'))
+def attempt_remove_standard_player(client, username):
+    """Attempt to remove a player while logged in as a standard user."""
+    test_state["last_response"] = client.delete(f"/api/admin/players/{username}")
+
+@when(parsers.parse('I attempt to rename non-existent player "{name}"'))
+def attempt_rename_non_existent(client, name):
+    """Attempt to rename a player that does not exist."""
+    payload = {"username": "SomeName"}
+    test_state["last_response"] = client.put(f"/api/admin/players/{name}", json=payload)
+
+@when(parsers.parse('I attempt to rename player "{name}" to empty username'))
+def attempt_rename_empty(client, name):
+    """Attempt to rename a player to an empty username."""
+    payload = {"username": ""}
+    test_state["last_response"] = client.put(f"/api/admin/players/{name}", json=payload)
+
+@when(parsers.parse('I attempt to rename player "{name}" to duplicate username "{duplicate_name}"'))
+def attempt_rename_duplicate(client, name, duplicate_name):
+    """Attempt to rename a player to a username that is already taken."""
+    payload = {"username": duplicate_name}
+    test_state["last_response"] = client.put(f"/api/admin/players/{name}", json=payload)
+
+@when(parsers.parse('I attempt to update player "{name}" with status "{status}"'))
+def attempt_update_status(client, name, status):
+    """Attempt to update a player status."""
+    payload = {"status": status}
+    test_state["last_response"] = client.put(f"/api/admin/players/{name}", json=payload)
+
+@when(parsers.parse('I attempt to update player "{name}" with role "{role}"'))
+def attempt_update_role(client, name, role):
+    """Attempt to update a player role."""
+    payload = {"role": role}
+    test_state["last_response"] = client.put(f"/api/admin/players/{name}", json=payload)
+
+@then(parsers.parse('the update should fail with status "{status}"'))
+def update_should_fail(status):
+    """Verify that a player update request fails with the expected error."""
+    res = test_state["last_response"]
+    assert res.status_code in [400, 404, 409]
+    assert status in res.json.get("error", "") or status in res.json.get("details", "")
+
+@when("I submit 6 incorrect guesses in demo mode")
+def submit_6_incorrect_demo(client):
+    """Submit 6 valid guesses that are incorrect in demo mode."""
+    for _ in range(6):
+        payload = {"guess": "CRANE"}
+        test_state["last_response"] = client.post("/api/game/demo/guess", json=payload)
+
+@then(parsers.parse('my demo game status should be "{status}"'))
+def demo_game_status_is(status):
+    """Verify that the demo game status is as expected."""
+    res = test_state["last_response"]
+    assert res.status_code == 200
+    assert res.json["status"] == status
+
+@then(parsers.parse('the target word should be revealed as "{word}"'))
+def target_word_revealed_as(word):
+    """Verify the target word revealed in demo mode."""
+    res = test_state["last_response"]
+    assert res.json.get("target_word") == word

@@ -61,3 +61,46 @@ Feature: User Administration
       Given I am signed in as player "Jon"
       When I access the user administration page
       Then I should see the authorization message "Access denied"
+
+    Scenario: Administrator views all registered players
+      Given a registered player "Alice" exists
+      And a registered player "Bob" exists
+      When I access the user administration page
+      Then I should see a list containing players "Alice" and "Bob"
+
+    Scenario: Standard player cannot modify player accounts
+      Given a registered player "Alice" exists
+      And I am signed in as player "Jon"
+      When I attempt to rename player "Alice" to "Alice123" as standard player
+      Then I should see the authorization message "Access denied"
+
+    Scenario: Standard player cannot remove a player account
+      Given a registered player "Alice" exists
+      And I am signed in as player "Jon"
+      When I attempt to remove player "Alice" as standard player
+      Then I should see the authorization message "Access denied"
+
+    Scenario: Administrator cannot update a non-existent player
+      When I attempt to rename non-existent player "NonExistent"
+      Then the update should fail with status "Player not found"
+
+    Scenario: Administrator cannot update a player to an empty username
+      Given a registered player "Alice" exists
+      When I attempt to rename player "Alice" to empty username
+      Then the update should fail with status "Invalid username"
+
+    Scenario: Administrator cannot update a player to a duplicate username
+      Given a registered player "Alice" exists
+      And a registered player "Bob" exists
+      When I attempt to rename player "Alice" to duplicate username "Bob"
+      Then the update should fail with status "Username already exists"
+
+    Scenario: Administrator cannot update a player with an invalid status
+      Given a registered player "Alice" exists
+      When I attempt to update player "Alice" with status "invalid_status"
+      Then the update should fail with status "Invalid status"
+
+    Scenario: Administrator cannot update a player with an invalid role
+      Given a registered player "Alice" exists
+      When I attempt to update player "Alice" with role "invalid_role"
+      Then the update should fail with status "Invalid role"
