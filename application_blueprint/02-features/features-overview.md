@@ -1,5 +1,6 @@
 Feature: Simple Player Registration
 Feature: User Authentication
+Feature: User Administration
 Feature: Daily Word Selection & Archive
 Feature: League Table & User Stats
 Feature: Game Play

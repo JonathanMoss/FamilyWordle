@@ -1,6 +1,7 @@
 Entities:
-- Registered Player
+- Player
+- Admin Player
 - Daily Word
 - Daily Game
 - League Table
-- Recent Word List
+- Recent/Archive Word List

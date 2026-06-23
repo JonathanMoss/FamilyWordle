@@ -1,4 +1,5 @@
 Relationships:
-- Registered Player plays a Daily Game
+- Player plays a Daily Game
+- Admin Player plays a Daily Game and Administers registered user accounts
 - Daily Game uses the Daily Word
-- Registered Players feature within the League Table
+- Players feature within the League Table
