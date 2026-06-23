@@ -1,0 +1,14 @@
+services:
+  web:
+    build: .
+    command: flask --app src.app:create_app run --host=0.0.0.0 --port=5000 --debug
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/workspace
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - SECRET_KEY=dev-secret-key-for-local-use
+      - ADMIN_USERNAME=admin
+      - ADMIN_PIN=1234
