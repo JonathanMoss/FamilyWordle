@@ -40,8 +40,8 @@ The application features a dark-themed glassmorphic UI, structured database stor
 
 1. **Set up a Virtual Environment**:
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate
+   python3 -m venv .venv
+   source .venv/bin/activate
    ```
 
 2. **Install Dependencies**:
@@ -118,7 +118,7 @@ Runs all unit and BDD (Behavior Driven Development) scenario tests:
 ```bash
 docker compose run --rm web pytest
 ```
-*(Alternatively, if running locally in your venv: `PYTHONPATH=. pytest`)*
+*(Alternatively, if running locally in your .venv: `PYTHONPATH=. pytest`)*
 
 ### 2. Run Code Linting
 Checks code style and linting standards using Pylint:
