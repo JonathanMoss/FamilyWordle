@@ -632,12 +632,41 @@ function renderAdminTable(players) {
             <td>${p.role}</td>
             <td><span style="color:${p.status === 'active' ? '#10b981' : '#f59e0b'}">${p.status}</span></td>
             <td>
-                <button class="btn-premium" onclick="updatePlayerAdmin('${p.username}', '${targetStatus}', null)">${toggleBtnText}</button>
+                <button class="btn-premium" onclick="renamePlayerAdmin('${p.username}')">Rename</button>
+                <button class="btn-premium" onclick="updatePlayerAdmin('${p.username}', '${targetStatus}', null)" style="margin-left:6px;">${toggleBtnText}</button>
                 <button class="btn-premium" onclick="removePlayerAdmin('${p.username}')" style="background:#ef4444; border-color:#ef4444; margin-left:6px;">Remove</button>
             </td>
         `;
         body.appendChild(tr);
     });
+}
+
+async function renamePlayerAdmin(username) {
+    const newName = prompt(`Enter new name for player "${username}":`, username);
+    if (newName === null) return;
+    const trimmed = newName.trim();
+    if (!trimmed) {
+        showToast("Invalid username");
+        return;
+    }
+    try {
+        const response = await fetch(`/api/admin/players/${username}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: trimmed })
+        });
+        const data = await response.json();
+        if (response.ok) {
+            showToast("Player renamed successfully");
+            const res = await fetch("/api/admin/players");
+            const refreshData = await res.json();
+            renderAdminTable(refreshData.players);
+        } else {
+            showToast(data.error || "Failed to rename player");
+        }
+    } catch (err) {
+        showToast("Error renaming player");
+    }
 }
 
 async function updatePlayerAdmin(username, status, role) {
