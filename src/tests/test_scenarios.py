@@ -1207,6 +1207,12 @@ def attempt_rename_duplicate(client, name, duplicate_name):
     payload = {"username": duplicate_name}
     test_state["last_response"] = client.put(f"/api/admin/players/{name}", json=payload)
 
+@when(parsers.parse('I attempt to rename player "{name}" to too long username "{too_long_name}"'))
+def attempt_rename_too_long(client, name, too_long_name):
+    """Attempt to rename a player to a username that exceeds length limits."""
+    payload = {"username": too_long_name}
+    test_state["last_response"] = client.put(f"/api/admin/players/{name}", json=payload)
+
 @when(parsers.parse('I attempt to update player "{name}" with status "{status}"'))
 def attempt_update_status(client, name, status):
     """Attempt to update a player status."""

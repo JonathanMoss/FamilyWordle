@@ -89,6 +89,11 @@ Feature: User Administration
       When I attempt to rename player "Alice" to empty username
       Then the update should fail with status "Invalid username"
 
+    Scenario: Administrator cannot update a player to a username that is too long
+      Given a registered player "Alice" exists
+      When I attempt to rename player "Alice" to too long username "VeryLongName1"
+      Then the update should fail with status "Invalid username"
+
     Scenario: Administrator cannot update a player to a duplicate username
       Given a registered player "Alice" exists
       And a registered player "Bob" exists

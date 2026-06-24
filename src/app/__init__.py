@@ -57,7 +57,7 @@ def create_app(db_uri: Optional[str] = None) -> Flask:
     admin_username = os.getenv("ADMIN_USERNAME")
     admin_pin = os.getenv("ADMIN_PIN")
     if admin_username and admin_pin:
-        if admin_pin.isdigit() and len(admin_pin) == 4:
+        if admin_pin.isdigit() and len(admin_pin) == 4 and len(admin_username) <= 10:
             with Session(engine) as db_session:
                 stmt = select(Player).where(Player.username == admin_username)
                 existing = db_session.exec(stmt).first()
@@ -73,7 +73,10 @@ def create_app(db_uri: Optional[str] = None) -> Flask:
                     db_session.commit()
                     app.logger.info("Auto-seeded admin user '%s'", admin_username)
         else:
-            app.logger.warning("ADMIN_PIN must be exactly 4 digits; admin auto-seeding skipped.")
+            app.logger.warning(
+                "ADMIN_PIN must be 4 digits and ADMIN_USERNAME <= 10; "
+                "admin auto-seeding skipped."
+            )
 
 
     # Register blueprints
@@ -109,6 +112,10 @@ def create_app(db_uri: Optional[str] = None) -> Flask:
         """Bootstrap an administrative user account via the CLI."""
         if not pin.isdigit() or len(pin) != 4:
             click.echo("❌ Error: PIN must be exactly 4 digits.")
+            return
+
+        if len(username) > 10:
+            click.echo("❌ Error: Player Name must be at most 10 characters.")
             return
 
         with Session(engine) as db_session:

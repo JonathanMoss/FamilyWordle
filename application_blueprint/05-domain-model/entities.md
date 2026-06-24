@@ -14,7 +14,7 @@ class Player(SQLModel, table=True):
         unique=True,
         index=True,
         min_length=1,
-        max_length=20,
+        max_length=10,
         regex="^[a-zA-Z0-9_-]+$" # Alphanumeric, underscores, and hyphens only
     )
     pin_hash: str = Field(description="Securely hashed PIN")

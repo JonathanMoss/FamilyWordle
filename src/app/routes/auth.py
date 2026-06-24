@@ -43,6 +43,12 @@ def register():
             "details": "PIN must contain only numeric digits"
         }), 400
 
+    if len(username) > 10:
+        return jsonify({
+            "error": "Validation failed",
+            "details": "Player Name must be at most 10 characters"
+        }), 400
+
     if not username.isalnum() and not all(c in "_-" for c in username if not c.isalnum()):
         return jsonify({
             "error": "Validation failed",

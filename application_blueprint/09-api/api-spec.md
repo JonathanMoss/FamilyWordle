@@ -13,7 +13,7 @@ This document details the REST API endpoints exposed by the Flask backend for co
 * **Request Body**:
   ```json
   {
-    "username": "string (1-20 chars, alphanumeric)",
+    "username": "string (1-10 chars, alphanumeric)",
     "pin": "string (exactly 4 numeric digits)"
   }
   ```

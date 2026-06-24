@@ -31,7 +31,7 @@ class Player(SQLModel, table=True):
     Represents a player or administrator account in the database.
     """
     id: Optional[int] = Field(default=None, primary_key=True)
-    username: str = Field(unique=True, index=True, min_length=1, max_length=20)
+    username: str = Field(unique=True, index=True, min_length=1, max_length=10)
     pin_hash: str = Field(description="Securely hashed PIN")
     role: str = Field(default=PlayerRole.PLAYER.value, description="Role: 'player' or 'admin'")
     status: str = Field(

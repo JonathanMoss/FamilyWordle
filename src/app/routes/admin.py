@@ -62,7 +62,7 @@ def update_player(username):
 
         if new_username is not None:
             new_username = new_username.strip()
-            if not new_username:
+            if not new_username or len(new_username) > 10:
                 return jsonify({"error": "Invalid username"}), 400
             # Check duplicate
             stmt_dup = select(Player).where(Player.username == new_username)

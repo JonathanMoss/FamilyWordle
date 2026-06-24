@@ -70,3 +70,12 @@ Feature: Player Registration
         | Jon@Home  |
         | Jon.Moss  |
         | Jon/Moss  |
+
+    Scenario: Registration fails when player name is too long
+      Given I am on the registration page
+      When I register with:
+        | Field       | Value         |
+        | Player Name | VeryLongName1 |
+        | PIN         | 1234          |
+      Then the account should not be created
+      And I should see the validation message "Player Name must be at most 10 characters"
