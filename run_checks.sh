@@ -21,12 +21,12 @@ else
 fi
 PYLINT_EXIT=$?
 
-# Run pytest (runs both unit and BDD tests)
-echo "2. Running pytest..."
+# Run pytest with code coverage (runs both unit and BDD tests)
+echo "2. Running pytest with coverage..."
 if /usr/bin/python3 -c "import sqlite3" &>/dev/null; then
-    /usr/bin/python3 -m pytest
+    /usr/bin/python3 -m pytest --cov=src --cov-fail-under=90
 else
-    pytest
+    pytest --cov=src --cov-fail-under=90
 fi
 PYTEST_EXIT=$?
 
