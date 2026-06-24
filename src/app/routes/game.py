@@ -8,7 +8,8 @@ from datetime import datetime, time, timedelta, timezone
 from flask import Blueprint, request, jsonify, session
 from sqlmodel import Session, select
 from src.app import get_engine
-from src.app.models import Player, DailyWord, DailyGame, PlayerStatus, GameStatus
+from src.app.decorators import login_required
+from src.app.models import DailyWord, DailyGame, GameStatus
 from src.app.services import (
     evaluate_guess,
     get_or_create_daily_word,
@@ -33,22 +34,12 @@ def get_remaining_seconds() -> int:
     return max(0, int((next_rollover - now).total_seconds()))
 
 @game_bp.route("/game/state", methods=["GET"])
+@login_required
 def game_state():
     """Retrieve the current daily game state for the signed-in player."""
-    username = session.get("username")
     user_id = session.get("user_id")
-    if not username or not user_id:
-        return jsonify({"error": "Authentication required"}), 401
-
     engine = get_engine()
     with Session(engine) as db_session:
-        # Check active status
-        stmt = select(Player).where(Player.id == user_id)
-        player = db_session.exec(stmt).first()
-        if not player or player.status != PlayerStatus.ACTIVE.value:
-            session.clear()
-            return jsonify({"error": "Account inactive"}), 401
-
         today_str = get_current_date_str()
         daily_word = get_or_create_daily_word(db_session)
 
@@ -86,12 +77,10 @@ def game_state():
         return jsonify(response), 200
 
 @game_bp.route("/game/guess", methods=["POST"])
+@login_required
 def game_guess():
     """Submit a guess for the daily game session."""
-    username = session.get("username")
     user_id = session.get("user_id")
-    if not username or not user_id:
-        return jsonify({"error": "Authentication required"}), 401
 
     data = request.get_json() or {}
     guess = data.get("guess", "").strip().upper()
@@ -110,13 +99,6 @@ def game_guess():
 
     engine = get_engine()
     with Session(engine) as db_session:
-        # Check active status
-        stmt = select(Player).where(Player.id == user_id)
-        player = db_session.exec(stmt).first()
-        if not player or player.status != PlayerStatus.ACTIVE.value:
-            session.clear()
-            return jsonify({"error": "Account inactive"}), 401
-
         today_str = get_current_date_str()
         daily_word = get_or_create_daily_word(db_session)
 
@@ -266,13 +248,10 @@ def demo_reset():
     return jsonify({"message": "Demo reset successfully"}), 200
 
 @game_bp.route("/stats", methods=["GET"])
+@login_required
 def stats():
     """Retrieve gameplay statistics and history for the signed-in player."""
-    username = session.get("username")
     user_id = session.get("user_id")
-    if not username or not user_id:
-        return jsonify({"error": "Authentication required"}), 401
-
     engine = get_engine()
     with Session(engine) as db_session:
         stmt = select(DailyGame).where(
@@ -317,12 +296,9 @@ def stats():
         }), 200
 
 @game_bp.route("/stats/league", methods=["GET"])
+@login_required
 def league():
     """Retrieve the sorted rankings table for all active players."""
-    # Allow signed-in players to see the league table
-    if not session.get("username"):
-        return jsonify({"error": "Authentication required"}), 401
-
     engine = get_engine()
     with Session(engine) as db_session:
         table = get_league_table(db_session)

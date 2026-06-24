@@ -241,6 +241,10 @@ function resetGridUI() {
     resetAppState();
     initializeGrid();
     resetKeyboardColors();
+    const shareContainer = document.getElementById("game-over-container");
+    if (shareContainer) {
+        shareContainer.style.display = "none";
+    }
 }
 
 // Keyboard rendering
@@ -329,6 +333,11 @@ async function loadActiveGame() {
         showToast(`Daily word was: ${data.target_word}`);
     } else if (appState.gameState === "expired") {
         showToast("Today's game has expired!");
+    }
+
+    const shareContainer = document.getElementById("game-over-container");
+    if (shareContainer && (appState.gameState === "won" || appState.gameState === "lost")) {
+        shareContainer.style.display = "block";
     }
 }
 
@@ -488,6 +497,8 @@ async function submitInputGuess() {
     // Execute flip animation
     await animateRowFlip(appState.currentRow, guess, data.feedback);
     
+    appState.guessesHistory.push({ word: guess, feedback: data.feedback });
+    
     appState.gameState = data.status;
     appState.currentRow++;
     appState.currentTile = 0;
@@ -497,6 +508,11 @@ async function submitInputGuess() {
         showToast("Congratulations!");
     } else if (data.status === "lost") {
         showToast(`Game Over. Word was: ${data.target_word}`);
+    }
+
+    const shareContainer = document.getElementById("game-over-container");
+    if (shareContainer && (data.status === "won" || data.status === "lost")) {
+        shareContainer.style.display = "block";
     }
 }
 
@@ -884,4 +900,28 @@ async function removePlayerAdmin(username) {
     } else {
         showToast(result.error);
     }
+}
+
+function shareResult() {
+    const attempts = appState.gameState === "won" ? appState.guessesHistory.length : "X";
+    const dateStr = new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    let text = `FamilyWordle (${dateStr}) ${attempts}/6\n\n`;
+    
+    appState.guessesHistory.forEach(g => {
+        const rowEmojis = g.feedback.map(f => {
+            if (f === "correct") return "🟩";
+            if (f === "present") return "🟨";
+            return "⬛";
+        }).join("");
+        text += rowEmojis + "\n";
+    });
+    
+    text += "\nPlay here: " + window.location.origin;
+    
+    navigator.clipboard.writeText(text).then(() => {
+        showToast("Result copied to clipboard! 🟩🟨⬛");
+    }).catch(err => {
+        showToast("Failed to copy results.");
+        console.error(err);
+    });
 }

@@ -3,25 +3,18 @@ Admin routes blueprint.
 Handles managing player lists, status updates, and soft removal.
 """
 # pylint: disable=too-many-return-statements
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify
 from sqlmodel import Session, select
 from src.app import get_engine
+from src.app.decorators import admin_required
 from src.app.models import Player, PlayerRole, PlayerStatus
 
 admin_bp = Blueprint("admin", __name__)
 
-def require_admin():
-    """Verify the signed-in user is an administrator."""
-    if session.get("role") != PlayerRole.ADMIN.value:
-        return False
-    return True
-
 @admin_bp.route("/players", methods=["GET"])
+@admin_required
 def list_players():
     """List all registered and active/disabled players (excluding removed)."""
-
-    if not require_admin():
-        return jsonify({"error": "Access denied", "details": "Administrator access required"}), 403
 
     engine = get_engine()
     with Session(engine) as db_session:
@@ -42,10 +35,9 @@ def list_players():
         return jsonify({"players": result}), 200
 
 @admin_bp.route("/players/<username>", methods=["PUT"])
+@admin_required
 def update_player(username):
     """Update a player's username, status, or role."""
-    if not require_admin():
-        return jsonify({"error": "Access denied"}), 403
 
     data = request.get_json() or {}
     new_status = data.get("status")
@@ -90,10 +82,9 @@ def update_player(username):
         return jsonify({"message": "Player updated successfully"}), 200
 
 @admin_bp.route("/players/<username>", methods=["DELETE"])
+@admin_required
 def remove_player(username):
     """Soft remove a player by setting status to removed."""
-    if not require_admin():
-        return jsonify({"error": "Access denied"}), 403
 
     engine = get_engine()
     with Session(engine) as db_session:
