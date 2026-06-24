@@ -33,6 +33,165 @@ function resetAppState() {
     }
 }
 
+// Sound Effects State & Synthesis
+let audioCtx = null;
+let isMuted = localStorage.getItem("sound_muted") === "true";
+
+function getAudioContext() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+    return audioCtx;
+}
+
+function playSound(type) {
+    if (isMuted) return;
+    try {
+        const ctx = getAudioContext();
+        const now = ctx.currentTime;
+        
+        switch (type) {
+            case "keypress": {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(180, now);
+                osc.frequency.exponentialRampToValueAtTime(80, now + 0.05);
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.05);
+                break;
+            }
+            case "delete": {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(140, now);
+                osc.frequency.exponentialRampToValueAtTime(60, now + 0.05);
+                gain.gain.setValueAtTime(0.06, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.05);
+                break;
+            }
+            case "shake": {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                const filter = ctx.createBiquadFilter();
+                osc.type = "sawtooth";
+                osc.frequency.setValueAtTime(90, now);
+                osc.frequency.linearRampToValueAtTime(80, now + 0.15);
+                filter.type = "lowpass";
+                filter.frequency.setValueAtTime(300, now);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.linearRampToValueAtTime(0.001, now + 0.15);
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.15);
+                break;
+            }
+            case "correct": {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(659.25, now); // E5
+                gain.gain.setValueAtTime(0.07, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.2);
+                break;
+            }
+            case "present": {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(440.00, now); // A4
+                gain.gain.setValueAtTime(0.06, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.18);
+                break;
+            }
+            case "absent": {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "sine";
+                osc.frequency.setValueAtTime(174.61, now); // F3
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.15);
+                break;
+            }
+            case "win": {
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                notes.forEach((freq, idx) => {
+                    const time = now + idx * 0.1;
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = "sine";
+                    osc.frequency.setValueAtTime(freq, time);
+                    gain.gain.setValueAtTime(0.06, time);
+                    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.35);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(time);
+                    osc.stop(time + 0.35);
+                });
+                break;
+            }
+            case "lost": {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = "triangle";
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.linearRampToValueAtTime(110, now + 0.6);
+                gain.gain.setValueAtTime(0.08, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.6);
+                break;
+            }
+        }
+    } catch (e) {
+        console.warn("Audio playback failed:", e);
+    }
+}
+
+function updateSoundUI() {
+    const btn = document.getElementById("btn-toggle-sound");
+    if (btn) {
+        btn.innerHTML = isMuted ? "🔇 Muted" : "🔊 Sound";
+    }
+}
+
+function toggleSound() {
+    isMuted = !isMuted;
+    localStorage.setItem("sound_muted", isMuted);
+    updateSoundUI();
+    if (!isMuted) {
+        playSound("keypress");
+    }
+}
+
 // Virtual Keyboard layout
 const KEYBOARD_LAYOUT = [
     ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
@@ -68,6 +227,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Render initial grid structure
     initializeGrid();
     initializeKeyboard();
+    updateSoundUI();
     
     // Register physical keyboard listeners
     document.addEventListener("keydown", handlePhysicalKeyDown);
@@ -442,6 +602,8 @@ function addInputChar(char) {
     if (appState.gameState !== "playing" && appState.gameState !== "not_started") return;
     if (appState.currentTile >= GAME_CONFIG.WORD_LENGTH) return;
     
+    playSound("keypress");
+    
     const tile = document.getElementById(`tile-${appState.currentRow}-${appState.currentTile}`);
     if (!tile) return;
     tile.innerText = char;
@@ -454,6 +616,8 @@ function addInputChar(char) {
 function deleteInputChar() {
     if (appState.gameState !== "playing" && appState.gameState !== "not_started") return;
     if (appState.currentTile <= 0) return;
+    
+    playSound("delete");
     
     appState.currentTile--;
     const tile = document.getElementById(`tile-${appState.currentRow}-${appState.currentTile}`);
@@ -506,8 +670,10 @@ async function submitInputGuess() {
     // Check end states
     if (data.status === "won") {
         showToast("Congratulations!");
+        playSound("win");
     } else if (data.status === "lost") {
         showToast(`Game Over. Word was: ${data.target_word}`);
+        playSound("lost");
     }
 
     const shareContainer = document.getElementById("game-over-container");
@@ -517,6 +683,7 @@ async function submitInputGuess() {
 }
 
 function shakeRow(rowIdx) {
+    playSound("shake");
     const row = document.getElementById(`row-${rowIdx}`);
     if (!row) return;
     row.classList.add("shake");
@@ -534,6 +701,7 @@ function animateTileFlip(tile, feedbackClass, char, index) {
             setTimeout(() => {
                 tile.classList.add(feedbackClass);
                 updateKeyboardColors(char, [feedbackClass]);
+                playSound(feedbackClass);
             }, 250);
             
             // Complete animation removal
