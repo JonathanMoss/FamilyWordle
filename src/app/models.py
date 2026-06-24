@@ -3,10 +3,14 @@ Database models for the Family Wordle application.
 Defines Player, DailyWord, and DailyGame tables.
 """
 # pylint: disable=too-few-public-methods
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 from sqlmodel import SQLModel, Field
+
+def utc_now() -> datetime:
+    """Return a timezone-naive UTC datetime."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 class PlayerRole(str, Enum):
     """Possible player roles."""
@@ -38,7 +42,7 @@ class Player(SQLModel, table=True):
         default=PlayerStatus.ACTIVE.value,
         description="Status: 'active', 'disabled', or 'removed'"
     )
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utc_now)
 
 class DailyWord(SQLModel, table=True):
     """
@@ -46,7 +50,7 @@ class DailyWord(SQLModel, table=True):
     """
     date: str = Field(primary_key=True, description="Calendar date in YYYY-MM-DD format")
     word: str = Field(min_length=5, max_length=5, description="The daily target 5-letter word")
-    selected_at: datetime = Field(default_factory=datetime.utcnow)
+    selected_at: datetime = Field(default_factory=utc_now)
 
 class DailyGame(SQLModel, table=True):
     """
@@ -66,4 +70,4 @@ class DailyGame(SQLModel, table=True):
     # Format: [{"word": "SLATE", "feedback": [...], "timestamp": "..."}]
     # feedback list elements are 'correct', 'present', or 'absent'
     guesses_json: str = Field(default="[]", description="Serialized JSON array of guesses")
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=utc_now)

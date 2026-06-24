@@ -4,7 +4,7 @@ Handles gameplay states, guesses, demo mode, stats, and archive.
 """
 # pylint: disable=too-many-return-statements,too-many-locals
 import json
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 from flask import Blueprint, request, jsonify, session
 from sqlmodel import Session, select
 from src.app import get_engine
@@ -161,7 +161,7 @@ def game_guess():
 
         game.attempts_used += 1
         game.guesses_json = json.dumps(guesses)
-        game.updated_at = datetime.utcnow()
+        game.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
         # Status checks
         if guess == daily_word:
