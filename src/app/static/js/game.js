@@ -918,10 +918,28 @@ function shareResult() {
     
     text += "\nPlay here: " + window.location.origin;
     
-    navigator.clipboard.writeText(text).then(() => {
-        showToast("Result copied to clipboard! 🟩🟨⬛");
-    }).catch(err => {
-        showToast("Failed to copy results.");
-        console.error(err);
-    });
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast("Result copied to clipboard! 🟩🟨⬛");
+        }).catch(err => {
+            showToast("Failed to copy results.");
+            console.error(err);
+        });
+    } else {
+        // Fallback for non-secure contexts (HTTP)
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.top = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand("copy");
+            showToast("Result copied to clipboard! 🟩🟨⬛");
+        } catch (err) {
+            showToast("Failed to copy results.");
+            console.error(err);
+        }
+        document.body.removeChild(textarea);
+    }
 }
