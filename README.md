@@ -18,12 +18,13 @@ The application features a dark-themed glassmorphic UI, structured database stor
   1. **Wins**: Total number of daily games won.
   2. **Average Turns**: Fewer average attempts per completed game ranks higher.
   3. **Current Streak**: Consecutive days of completed daily games (resets if a day is missed).
+* **Practice Mode & Replays**: Unregistered or signed-out users can play a demo game to practice. Signed-in players can browse the Chronological Archive and click "Play" to replay any past daily word in an isolated sandbox. Replay games do not affect official statistics, active streaks, or the daily game state.
 
 ---
 
 ## 👤 User & Admin Roles
 
-* **Player (Standard User)**: Can register, sign in using their nickname and PIN, play the daily game, view the public league table, check their own historical statistics, and browse the chronological archive of previously played daily words.
+* **Player (Standard User)**: Can register, sign in using their nickname and PIN, play the daily game, view the public league table, check their own historical statistics, browse the chronological archive of previously played daily words (with words blurred by default to prevent spoilers), and replay past daily words in an isolated practice mode.
 * **Administrator**: Has access to a user administration panel to view, update, disable/enable, or soft-remove player accounts.
 
 ---
