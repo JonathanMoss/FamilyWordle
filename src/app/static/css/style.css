@@ -510,3 +510,15 @@ main {
     border-color: #ef4444 !important;
 }
 
+.archive-word.blurred {
+    filter: blur(5px);
+    cursor: pointer;
+    transition: filter 0.2s;
+    user-select: none;
+}
+
+.archive-word.blurred:hover {
+    filter: none;
+    user-select: auto;
+}
+
