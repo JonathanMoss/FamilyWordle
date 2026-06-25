@@ -312,11 +312,15 @@ async function handleAuthSubmit() {
 }
 
 async function checkActiveSession() {
-    const result = await apiRequest("/api/game/state");
-    if (result.ok) {
-        // User is signed in!
-        updateNavActions("Player", "player"); // default fallback, will correct on stats call
-        loadActiveGame();
+    if (sessionStorage.getItem("is_demo_mode") === "true") {
+        loadDemoGame();
+    } else {
+        const result = await apiRequest("/api/game/state");
+        if (result.ok) {
+            // User is signed in!
+            updateNavActions("Player", "player"); // default fallback, will correct on stats call
+            loadActiveGame();
+        }
     }
 }
 
@@ -729,16 +733,58 @@ async function animateRowFlip(rowIdx, word, feedback) {
 }
 
 // Practice / Demo Mode
-function startDemoMode() {
-    appState.isDemoMode = true;
-    appState.gameState = "playing";
+async function startDemoMode() {
+    sessionStorage.setItem("is_demo_mode", "true");
+    // Explicitly reset standard demo mode to 'LEARN'
+    await apiRequest("/api/game/demo/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ word: "LEARN", date: null })
+    });
+    loadDemoGame();
+}
+
+async function startReplayGame(word, date) {
+    sessionStorage.setItem("is_demo_mode", "true");
+    const result = await apiRequest("/api/game/demo/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ word, date })
+    });
+    if (result.ok) {
+        closeModal("modal-archive");
+        loadDemoGame();
+    } else {
+        showToast(result.error);
+    }
+}
+
+async function loadDemoGame() {
+    const result = await apiRequest("/api/game/demo/state");
+    if (!result.ok) {
+        sessionClearUI();
+        return;
+    }
+    const data = result.data;
+    
     resetGridUI();
+    appState.isDemoMode = true;
+    appState.gameState = data.status;
+    appState.currentRow = data.attempts_used;
+    appState.guessesHistory = data.guesses;
     
     const banner = document.getElementById("game-mode-banner");
     if (banner) {
-        banner.innerText = "DEMO MODE";
+        if (data.date) {
+            const dateParts = data.date.split('-');
+            const formattedDate = dateParts.length === 3 ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}` : data.date;
+            banner.innerText = `REPLAY: ${formattedDate}`;
+            banner.className = "banner-demo";
+        } else {
+            banner.innerText = "DEMO MODE";
+            banner.className = "banner-demo";
+        }
         banner.style.background = ""; // Clear inline background style to fallback on CSS classes
-        banner.className = "banner-demo";
     }
     const exitContainer = document.getElementById("demo-exit-container");
     if (exitContainer) {
@@ -749,17 +795,29 @@ function startDemoMode() {
         timerElement.innerText = "Practice Mode";
     }
     
+    // Populate previous guesses
+    appState.guessesHistory.forEach((g, idx) => {
+        renderRowWithFeedback(idx, g.word, g.feedback);
+        updateKeyboardColors(g.word, g.feedback);
+    });
+    
     showView("game-view");
 }
 
-function exitDemoMode() {
-    sessionClearUI();
+async function exitDemoMode() {
+    sessionStorage.removeItem("is_demo_mode");
+    const result = await apiRequest("/api/game/state");
+    if (result.ok) {
+        loadActiveGame();
+    } else {
+        sessionClearUI();
+    }
 }
 
 async function resetDemoMode() {
     const result = await apiRequest("/api/game/demo/reset", { method: "POST" });
     if (result.ok) {
-        startDemoMode();
+        loadDemoGame();
     } else {
         showToast(result.error);
     }
@@ -916,17 +974,42 @@ async function openArchiveModal() {
                 const div = document.createElement("div");
                 div.className = "archive-item";
                 
+                // Format YYYY-MM-DD to DD-MM-YYYY
+                const dateParts = w.date.split('-');
+                const formattedDate = dateParts.length === 3 ? `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}` : w.date;
+                
                 const dateSpan = document.createElement("span");
-                dateSpan.textContent = `📅 ${w.date}`;
+                dateSpan.textContent = `📅 ${formattedDate}`;
+                
+                const rightContainer = document.createElement("div");
+                rightContainer.style.display = "flex";
+                rightContainer.style.alignItems = "center";
+                rightContainer.style.gap = "12px";
                 
                 const wordSpan = document.createElement("span");
-                wordSpan.className = "archive-word";
+                wordSpan.className = "archive-word blurred";
+                wordSpan.title = "Hover or tap to reveal";
                 const wordStrong = document.createElement("strong");
                 wordStrong.textContent = w.word;
                 wordSpan.appendChild(wordStrong);
                 
+                // Clicking manually toggles blur on mobile
+                wordSpan.addEventListener("click", () => {
+                    wordSpan.classList.toggle("blurred");
+                });
+                
+                const playBtn = document.createElement("button");
+                playBtn.className = "btn-premium";
+                playBtn.style.padding = "4px 8px";
+                playBtn.style.fontSize = "0.8rem";
+                playBtn.textContent = "Play";
+                playBtn.addEventListener("click", () => startReplayGame(w.word, w.date));
+                
+                rightContainer.appendChild(wordSpan);
+                rightContainer.appendChild(playBtn);
+                
                 div.appendChild(dateSpan);
-                div.appendChild(wordSpan);
+                div.appendChild(rightContainer);
                 list.appendChild(div);
             });
         }

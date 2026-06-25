@@ -176,7 +176,8 @@ def demo_state():
         demo_game = {
             "status": GameStatus.PLAYING.value,
             "attempts_used": 0,
-            "guesses": []
+            "guesses": [],
+            "target_word": DEMO_TARGET
         }
         session["demo_game"] = demo_game
 
@@ -190,7 +191,8 @@ def demo_guess():
         demo_game = {
             "status": GameStatus.PLAYING.value,
             "attempts_used": 0,
-            "guesses": []
+            "guesses": [],
+            "target_word": DEMO_TARGET
         }
 
     data = request.get_json() or {}
@@ -211,19 +213,20 @@ def demo_guess():
     if demo_game["attempts_used"] >= 6:
         return jsonify({"error": "No guesses remaining"}), 400
 
-    feedback = evaluate_guess(guess, DEMO_TARGET)
+    target = demo_game.get("target_word", DEMO_TARGET)
+    feedback = evaluate_guess(guess, target)
     demo_game["guesses"].append({
         "word": guess,
         "feedback": feedback
     })
     demo_game["attempts_used"] += 1
 
-    if guess == DEMO_TARGET:
+    if guess == target:
         demo_game["status"] = GameStatus.WON.value
-        demo_game["target_word"] = DEMO_TARGET
+        demo_game["target_word"] = target
     elif demo_game["attempts_used"] >= 6:
         demo_game["status"] = GameStatus.LOST.value
-        demo_game["target_word"] = DEMO_TARGET
+        demo_game["target_word"] = target
 
     session["demo_game"] = demo_game
 
@@ -233,17 +236,34 @@ def demo_guess():
         "attempts_used": demo_game["attempts_used"]
     }
     if demo_game["status"] in [GameStatus.WON.value, GameStatus.LOST.value]:
-        response["target_word"] = DEMO_TARGET
+        response["target_word"] = target
 
     return jsonify(response), 200
 
 @game_bp.route("/game/demo/reset", methods=["POST"])
 def demo_reset():
-    """Reset the isolated demo mode session state."""
+    """Reset the isolated demo mode session state, keeping the current target word if any."""
+    current_demo = session.get("demo_game") or {}
+    target_word = current_demo.get("target_word", DEMO_TARGET)
+    target_date = current_demo.get("date")
+
+    # Check if a custom word and date is provided in the JSON body
+    data = request.get_json(silent=True) or {}
+    new_word = data.get("word", "").strip().upper()
+    new_date = data.get("date", "").strip()
+
+    if new_word:
+        if len(new_word) != 5 or not new_word.isalpha():
+            return jsonify({"error": "Invalid target word"}), 400
+        target_word = new_word
+        target_date = new_date if new_date else None
+
     session["demo_game"] = {
         "status": GameStatus.PLAYING.value,
         "attempts_used": 0,
-        "guesses": []
+        "guesses": [],
+        "target_word": target_word,
+        "date": target_date
     }
     return jsonify({"message": "Demo reset successfully"}), 200
 
