@@ -1251,3 +1251,36 @@ def target_word_revealed_as(word):
     """Verify the target word revealed in demo mode."""
     res = test_state["last_response"]
     assert res.json.get("target_word") == word
+
+@when(parsers.parse('I start a replay game with word "{word}" and date "{date}"'))
+def start_replay_game(client, db_session, word, date):
+    """Start a practice mode replay game with a custom target word and date."""
+    _ensure_logged_in(client, db_session)
+    payload = {"word": word, "date": date}
+    client.post("/api/game/demo/reset", json=payload)
+    test_state["last_response"] = client.get("/api/game/demo/state")
+
+@then(parsers.parse('the active demo target word should be "{word}"'))
+def active_demo_target_word_is(word):
+    """Verify the active target word in demo mode."""
+    res = test_state["last_response"]
+    assert res.status_code == 200
+    assert res.json.get("target_word") == word
+
+@given(parsers.parse('I have started a replay game with word "{word}" and date "{date}"'))
+def have_started_replay_game(client, db_session, word, date):
+    """Establish that a player has started a custom replay game."""
+    _ensure_logged_in(client, db_session)
+    payload = {"word": word, "date": date}
+    client.post("/api/game/demo/reset", json=payload)
+
+@when(parsers.parse('I submit the guess "{guess}" in demo mode'))
+def submit_custom_guess_demo(client, guess):
+    """Submit a custom guess in demo/replay mode."""
+    test_state["last_response"] = client.post("/api/game/demo/guess", json={"guess": guess})
+
+@when("I reset the demo game")
+def reset_demo_game(client):
+    """Reset the demo game board."""
+    client.post("/api/game/demo/reset")
+    test_state["last_response"] = client.get("/api/game/demo/state")

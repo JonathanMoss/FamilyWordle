@@ -54,3 +54,25 @@ Feature: Demo Mode
       When I submit 6 incorrect guesses in demo mode
       Then my demo game status should be "lost"
       And the target word should be revealed as "LEARN"
+
+  Rule: Players can replay past daily words in practice/demo mode
+
+    Scenario: Player starts a replay of a previous daily word
+      Given I am signed in as "Jon"
+      When I start a replay game with word "CRANE" and date "2026-06-24"
+      Then my demo game status should be "playing"
+      And the active demo target word should be "CRANE"
+
+    Scenario: Player can guess the custom replay word
+      Given I am signed in as "Jon"
+      And I have started a replay game with word "CRANE" and date "2026-06-24"
+      When I submit the guess "CRANE" in demo mode
+      Then my demo game status should be "won"
+
+    Scenario: Resetting a custom replay game preserves the custom word
+      Given I am signed in as "Jon"
+      And I have started a replay game with word "CRANE" and date "2026-06-24"
+      When I reset the demo game
+      Then my demo game status should be "playing"
+      And the active demo target word should be "CRANE"
+
