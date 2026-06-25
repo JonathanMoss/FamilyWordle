@@ -699,6 +699,7 @@ function animateTileFlip(tile, feedbackClass, char, index) {
             
             // Halfway through flip (250ms), change colors
             setTimeout(() => {
+                tile.classList.remove("pop");
                 tile.classList.add(feedbackClass);
                 updateKeyboardColors(char, [feedbackClass]);
                 playSound(feedbackClass);

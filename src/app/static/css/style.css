@@ -161,6 +161,7 @@ main {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     grid-gap: 8px;
+    perspective: 1000px;
 }
 
 .tile {
@@ -177,6 +178,9 @@ main {
     user-select: none;
     transition: transform 0.2s;
     border-radius: 8px;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    will-change: transform;
 }
 
 .tile.pop {
@@ -443,6 +447,7 @@ main {
 }
 
 .tile.flip {
+    transition: none !important;
     animation: flipIn 0.5s ease-in-out;
 }
 
