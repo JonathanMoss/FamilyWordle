@@ -522,3 +522,17 @@ main {
     user-select: auto;
 }
 
+/* Keyboard disabled when bot is autoplaying */
+.keyboard-disabled .key {
+    cursor: not-allowed;
+    opacity: 0.75;
+    pointer-events: none;
+    transform: none !important;
+}
+
+.keyboard-disabled .key:hover, .keyboard-disabled .key:active {
+    transform: none !important;
+    background-color: #334155;
+}
+
+

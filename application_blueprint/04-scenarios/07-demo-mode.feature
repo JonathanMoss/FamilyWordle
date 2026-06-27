@@ -76,3 +76,11 @@ Feature: Demo Mode
       Then my demo game status should be "playing"
       And the active demo target word should be "CRANE"
 
+  Rule: Spectator bot mode can solve demo games automatically
+
+    Scenario: Player retrieves the permitted words list for the bot
+      Given I am on the home page
+      When the bot requests the permitted words list
+      Then the bot should receive a list of 8 words
+
+
