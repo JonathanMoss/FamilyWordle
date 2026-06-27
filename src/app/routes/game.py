@@ -255,6 +255,15 @@ def demo_reset():
     new_date = data.get("date") or ""
     new_date = new_date.strip()
 
+    if new_date:
+        try:
+            datetime.strptime(new_date, "%Y-%m-%d")
+        except ValueError:
+            return jsonify({
+                "error": "Invalid date format",
+                "details": "Date must be in YYYY-MM-DD format"
+            }), 400
+
     if new_word == "RANDOM":
         import random
         words = load_permitted_words()
