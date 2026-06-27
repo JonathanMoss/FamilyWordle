@@ -13,6 +13,7 @@ const appState = {
     activeView: "auth-view",
     authMode: "login", // 'login' or 'register'
     isDemoMode: false,
+    isBotPlaying: false,
     gameState: "not_started", // 'not_started', 'playing', 'won', 'lost', 'expired'
     currentRow: 0,
     currentTile: 0,
@@ -23,6 +24,7 @@ const appState = {
 
 // Helper to reset appState
 function resetAppState() {
+    stopBotSolve();
     appState.currentRow = 0;
     appState.currentTile = 0;
     appState.boardState = Array(GAME_CONFIG.MAX_ROWS).fill("");
@@ -577,6 +579,7 @@ function startCountdown(seconds) {
 // Key Presses Handlers
 function handlePhysicalKeyDown(e) {
     if (appState.activeView !== "game-view") return;
+    if (appState.isBotPlaying) return;
     
     // Ignore key presses during open modals
     if (document.querySelector(".modal-overlay.active")) return;
@@ -592,6 +595,7 @@ function handlePhysicalKeyDown(e) {
 
 function handleVirtualKeyPress(key) {
     if (appState.activeView !== "game-view") return;
+    if (appState.isBotPlaying) return;
     
     if (key === "enter") {
         submitInputGuess();
@@ -735,11 +739,11 @@ async function animateRowFlip(rowIdx, word, feedback) {
 // Practice / Demo Mode
 async function startDemoMode() {
     sessionStorage.setItem("is_demo_mode", "true");
-    // Explicitly reset standard demo mode to 'LEARN'
+    // Explicitly reset standard demo mode to a random word
     await apiRequest("/api/game/demo/reset", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ word: "LEARN", date: null })
+        body: JSON.stringify({ word: "RANDOM", date: null })
     });
     loadDemoGame();
 }
@@ -805,6 +809,7 @@ async function loadDemoGame() {
 }
 
 async function exitDemoMode() {
+    stopBotSolve();
     sessionStorage.removeItem("is_demo_mode");
     const result = await apiRequest("/api/game/state");
     if (result.ok) {
@@ -815,7 +820,12 @@ async function exitDemoMode() {
 }
 
 async function resetDemoMode() {
-    const result = await apiRequest("/api/game/demo/reset", { method: "POST" });
+    stopBotSolve();
+    const result = await apiRequest("/api/game/demo/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ word: "RANDOM", date: null })
+    });
     if (result.ok) {
         loadDemoGame();
     } else {
@@ -1194,4 +1204,237 @@ function shareResult() {
         }
         document.body.removeChild(textarea);
     }
+}
+
+// ==========================================
+// Spectator Bot Autoplay (Option A)
+// ==========================================
+
+function evaluateFeedbackForBot(guess, target) {
+    guess = guess.toUpperCase();
+    target = target.toUpperCase();
+    const feedback = Array(5).fill("absent");
+    const targetMatched = Array(5).fill(false);
+    const guessMatched = Array(5).fill(false);
+
+    // Green pass
+    for (let i = 0; i < 5; i++) {
+        if (guess[i] === target[i]) {
+            feedback[i] = "correct";
+            targetMatched[i] = true;
+            guessMatched[i] = true;
+        }
+    }
+
+    // Yellow pass
+    for (let i = 0; i < 5; i++) {
+        if (guessMatched[i]) continue;
+        for (let j = 0; j < 5; j++) {
+            if (!targetMatched[j] && guess[i] === target[j]) {
+                feedback[i] = "present";
+                targetMatched[j] = true;
+                break;
+            }
+        }
+    }
+    return feedback;
+}
+
+let botSolveTimeout = null;
+
+async function startBotSolve() {
+    appState.isBotPlaying = true;
+    
+    // Clear any half-entered characters in current row
+    while (appState.currentTile > 0) {
+        deleteInputChar();
+    }
+    
+    // Add disabled class to keyboard for visual styling
+    const keyboardEl = document.getElementById("keyboard");
+    if (keyboardEl) {
+        keyboardEl.classList.add("keyboard-disabled");
+    }
+    
+    // Update button styling/text
+    const btn = document.getElementById("btn-bot-play");
+    if (btn) {
+        btn.innerText = "Stop Bot";
+        btn.classList.add("btn-danger");
+    }
+
+    // Show status panel
+    const statusPanel = document.getElementById("bot-status-panel");
+    const statusText = document.getElementById("bot-status-text");
+    if (statusPanel) statusPanel.style.display = "block";
+    if (statusText) statusText.innerText = "Bot is initializing...";
+
+    // Fetch dictionary if not already cached
+    if (!appState.cachedDictionary) {
+        if (statusText) statusText.innerText = "Fetching word list...";
+        const res = await apiRequest("/api/game/dictionary");
+        if (!res.ok) {
+            if (statusText) statusText.innerText = "Error loading word list: " + res.error;
+            stopBotSolve();
+            return;
+        }
+        appState.cachedDictionary = res.data.words;
+    }
+
+    // Initialize candidates
+    appState.botCandidates = [...appState.cachedDictionary];
+    
+    botSolveStep();
+}
+
+function stopBotSolve() {
+    appState.isBotPlaying = false;
+    if (botSolveTimeout) {
+        clearTimeout(botSolveTimeout);
+        botSolveTimeout = null;
+    }
+    
+    const keyboardEl = document.getElementById("keyboard");
+    if (keyboardEl) {
+        keyboardEl.classList.remove("keyboard-disabled");
+    }
+    
+    const btn = document.getElementById("btn-bot-play");
+    if (btn) {
+        btn.innerText = "Watch Bot Solve";
+        btn.classList.remove("btn-danger");
+    }
+    
+    const statusPanel = document.getElementById("bot-status-panel");
+    if (statusPanel) {
+        statusPanel.style.display = "none";
+    }
+}
+
+function toggleBotPlay() {
+    if (appState.isBotPlaying) {
+        stopBotSolve();
+    } else {
+        startBotSolve();
+    }
+}
+
+async function botSolveStep() {
+    if (!appState.isBotPlaying) return;
+    
+    const statusText = document.getElementById("bot-status-text");
+    
+    // Check if game is already complete
+    if (appState.gameState === "won" || appState.gameState === "lost") {
+        if (statusText) {
+            statusText.innerText = appState.gameState === "won" 
+                ? "Bot solved the puzzle successfully! 🎉" 
+                : "Bot run complete.";
+        }
+        // Stop playing but keep status visible for feedback
+        appState.isBotPlaying = false;
+        const btn = document.getElementById("btn-bot-play");
+        if (btn) {
+            btn.innerText = "Watch Bot Solve";
+            btn.classList.remove("btn-danger");
+        }
+        const keyboardEl = document.getElementById("keyboard");
+        if (keyboardEl) {
+            keyboardEl.classList.remove("keyboard-disabled");
+        }
+        return;
+    }
+
+    if (appState.currentRow >= GAME_CONFIG.MAX_ROWS) {
+        if (statusText) statusText.innerText = "No attempts remaining.";
+        stopBotSolve();
+        return;
+    }
+
+    // Filter candidates based on guessesHistory
+    let candidates = [...appState.cachedDictionary];
+    appState.guessesHistory.forEach(g => {
+        candidates = candidates.filter(cand => {
+            const feed = evaluateFeedbackForBot(g.word, cand);
+            return feed.every((val, idx) => val === g.feedback[idx]);
+        });
+    });
+
+    if (candidates.length === 0) {
+        if (statusText) statusText.innerText = "No matching words left in dictionary!";
+        stopBotSolve();
+        return;
+    }
+
+    // Pick best word
+    let nextWord = "";
+    if (candidates.length === appState.cachedDictionary.length) {
+        // High quality starter words to speed up computation
+        nextWord = candidates.includes("CRANE") ? "CRANE" : candidates[0];
+    } else if (candidates.length === 1) {
+        nextWord = candidates[0];
+    } else {
+        // Compute letter frequencies in remaining candidates
+        const freq = {};
+        candidates.forEach(cand => {
+            const uniqueChars = new Set(cand);
+            uniqueChars.forEach(char => {
+                freq[char] = (freq[char] || 0) + 1;
+            });
+        });
+        
+        let bestScore = -1;
+        candidates.forEach(cand => {
+            const uniqueChars = new Set(cand);
+            let score = 0;
+            uniqueChars.forEach(char => {
+                score += freq[char] || 0;
+            });
+            if (score > bestScore) {
+                bestScore = score;
+                nextWord = cand;
+            }
+        });
+    }
+
+    if (statusText) {
+        statusText.innerText = `Bot is typing: ${nextWord} (Candidates remaining: ${candidates.length})`;
+    }
+
+    // Emulate typing
+    await emulateTyping(nextWord);
+    
+    if (!appState.isBotPlaying) return;
+
+    // Submit guess
+    if (statusText) {
+        statusText.innerText = `Bot submitting: ${nextWord}...`;
+    }
+    
+    await submitInputGuess();
+    
+    if (!appState.isBotPlaying) return;
+
+    // Schedule next guess after a short delay (e.g. 1.2 seconds) to let row animations finish
+    botSolveTimeout = setTimeout(botSolveStep, 1200);
+}
+
+function emulateTyping(word) {
+    return new Promise((resolve) => {
+        let index = 0;
+        function typeChar() {
+            if (!appState.isBotPlaying) {
+                resolve();
+                return;
+            }
+            if (index < word.length) {
+                addInputChar(word[index]);
+                index++;
+                setTimeout(typeChar, 150);
+            } else {
+                resolve();
+            }
+        }
+        typeChar();
+    });
 }

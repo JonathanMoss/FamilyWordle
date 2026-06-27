@@ -1284,3 +1284,19 @@ def reset_demo_game(client):
     """Reset the demo game board."""
     client.post("/api/game/demo/reset")
     test_state["last_response"] = client.get("/api/game/demo/state")
+
+@when("the bot requests the permitted words list")
+def bot_requests_dictionary(client):
+    """Bot requests the permitted words list."""
+    test_state["last_response"] = client.get("/api/game/dictionary")
+
+@then("the bot should receive a list of 8 words")
+def bot_receives_8_words():
+    """Verify that the bot receives a list of 8 mocked words in test mode."""
+    res = test_state["last_response"]
+    assert res.status_code == 200
+    words = res.json.get("words")
+    assert isinstance(words, list)
+    assert len(words) == 8
+    assert "LEARN" in words
+

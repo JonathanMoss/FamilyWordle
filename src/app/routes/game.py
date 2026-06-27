@@ -18,7 +18,8 @@ from src.app.services import (
     get_player_streak,
     get_player_max_streak,
     get_league_table,
-    LONDON_TZ
+    LONDON_TZ,
+    load_permitted_words
 )
 
 game_bp = Blueprint("game", __name__)
@@ -249,10 +250,17 @@ def demo_reset():
 
     # Check if a custom word and date is provided in the JSON body
     data = request.get_json(silent=True) or {}
-    new_word = data.get("word", "").strip().upper()
-    new_date = data.get("date", "").strip()
+    new_word = data.get("word") or ""
+    new_word = new_word.strip().upper()
+    new_date = data.get("date") or ""
+    new_date = new_date.strip()
 
-    if new_word:
+    if new_word == "RANDOM":
+        import random
+        words = load_permitted_words()
+        target_word = random.choice(words) if words else DEMO_TARGET
+        target_date = None
+    elif new_word:
         if len(new_word) != 5 or not new_word.isalpha():
             return jsonify({"error": "Invalid target word"}), 400
         target_word = new_word
@@ -266,6 +274,12 @@ def demo_reset():
         "date": target_date
     }
     return jsonify({"message": "Demo reset successfully"}), 200
+
+@game_bp.route("/game/dictionary", methods=["GET"])
+def get_dictionary():
+    """Retrieve the permitted 5-letter word list for the bot solver."""
+    words = load_permitted_words()
+    return jsonify({"words": words}), 200
 
 @game_bp.route("/stats", methods=["GET"])
 @login_required
