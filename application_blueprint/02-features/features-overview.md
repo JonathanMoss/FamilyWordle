@@ -7,3 +7,5 @@ Feature: Game Play
 Feature: Demo/Example Mode
 Feature: Online Documentation
 Feature: View Previous Words & Stats
+Feature: Spectator Bot Autoplay
+

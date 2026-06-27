@@ -157,9 +157,38 @@ This document details the REST API endpoints exposed by the Flask backend for co
 
 ### 8. Reset Demo Game
 * **Endpoint**: `POST /api/game/demo/reset`
-* **Description**: Clear the current demo session to allow replaying.
+* **Description**: Clear the current demo session to allow replaying. Optionally sets a custom target word or requests a random word from the dictionary.
+* **Request Body**:
+  ```json
+  {
+    "word": "string (5 letters) | RANDOM (optional)",
+    "date": "string (YYYY-MM-DD) | null (optional)"
+  }
+  ```
 * **Responses**:
-  * **200 OK**
+  * **200 OK**:
+    ```json
+    {
+      "message": "Demo reset successfully"
+    }
+    ```
+  * **400 Bad Request** (validation fails):
+    ```json
+    {
+      "error": "Invalid target word"
+    }
+    ```
+
+### 9. Get Permitted Words
+* **Endpoint**: `GET /api/game/dictionary`
+* **Description**: Retrieve the complete list of valid 5-letter words from the permitted dictionary list, used client-side by the spectator bot solver.
+* **Responses**:
+  * **200 OK**:
+    ```json
+    {
+      "words": ["CRANE", "SLATE", "LEARN", "TIGER", "HOUSE"]
+    }
+    ```
 
 ---
 
