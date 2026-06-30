@@ -1299,4 +1299,3 @@ def bot_receives_8_words():
     assert isinstance(words, list)
     assert len(words) == 8
     assert "LEARN" in words
-

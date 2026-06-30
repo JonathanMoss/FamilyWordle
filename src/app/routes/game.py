@@ -4,6 +4,7 @@ Handles gameplay states, guesses, demo mode, stats, and archive.
 """
 # pylint: disable=too-many-return-statements,too-many-locals
 import json
+import random
 from datetime import datetime, time, timedelta, timezone
 from flask import Blueprint, request, jsonify, session
 from sqlmodel import Session, select
@@ -265,7 +266,6 @@ def demo_reset():
             }), 400
 
     if new_word == "RANDOM":
-        import random
         words = load_permitted_words()
         target_word = random.choice(words) if words else DEMO_TARGET
         target_date = None
