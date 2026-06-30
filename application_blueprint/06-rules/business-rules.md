@@ -12,6 +12,8 @@ Rules:
 - Players have a maximum of 6 attempts to guess the daily word.
 - A daily game is completed when the player correctly guesses the word (win), uses all 6 attempts (loss), or the daily reset at 00:01 occurs (expired).
 - If a player does not guess the word, the word is revealed only when the game is completed (either by using 6 guesses or at the daily rollover).
+- The first player to correctly guess the daily word (win) is allowed to submit a short clue/hint (up to 100 characters) for that day's word. Other players will see this clue during their play on the same day.
+
 
 - All guesses must be valid 5-letter words from the permitted word list. The permitted word list is loaded from `data/words.txt` and cached in memory (to prevent repeated disk reads) to keep it highly performant while still configurable without code changes.
 - If all words in `data/words.txt` are exhausted (meaning they all appear in the historical archive), the system triggers a self-healing fallback: it purges all archive entries older than 30 days to recycle the words for gameplay, ensuring the server remains continuously operational.

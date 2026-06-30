@@ -471,6 +471,30 @@ async function loadActiveGame() {
     appState.currentRow = data.attempts_used;
     appState.guessesHistory = data.guesses;
     
+    
+    // Render Clues
+    const clueContainer = document.getElementById("clue-container");
+    const clueText = document.getElementById("clue-text");
+    if (clueContainer && clueText) {
+        if (data.clue) {
+            clueText.innerText = data.clue;
+            clueContainer.style.display = "block";
+        } else {
+            clueContainer.style.display = "none";
+        }
+    }
+
+    const clueSubmitContainer = document.getElementById("clue-submit-container");
+    if (clueSubmitContainer) {
+        if (data.status === "won" && data.is_first_solver && !data.clue) {
+            clueSubmitContainer.style.display = "block";
+            const inputClue = document.getElementById("input-clue");
+            if (inputClue) inputClue.value = "";
+        } else {
+            clueSubmitContainer.style.display = "none";
+        }
+    }
+
     const banner = document.getElementById("game-mode-banner");
     if (banner) {
         banner.innerText = "DAILY GAME";
@@ -679,6 +703,12 @@ async function submitInputGuess() {
     if (data.status === "won") {
         showToast("Congratulations!");
         playSound("win");
+        const clueSubmitContainer = document.getElementById("clue-submit-container");
+        if (clueSubmitContainer && data.is_first_solver) {
+            clueSubmitContainer.style.display = "block";
+            const inputClue = document.getElementById("input-clue");
+            if (inputClue) inputClue.value = "";
+        }
     } else if (data.status === "lost") {
         showToast(`Game Over. Word was: ${data.target_word}`);
         playSound("lost");
@@ -805,6 +835,13 @@ async function loadDemoGame() {
         updateKeyboardColors(g.word, g.feedback);
     });
     
+    
+    // Hide daily clue containers in demo mode
+    const clueContainer = document.getElementById("clue-container");
+    const clueSubmitContainer = document.getElementById("clue-submit-container");
+    if (clueContainer) clueContainer.style.display = "none";
+    if (clueSubmitContainer) clueSubmitContainer.style.display = "none";
+
     showView("game-view");
 }
 
@@ -1437,4 +1474,47 @@ function emulateTyping(word) {
         }
         typeChar();
     });
+}
+
+async function submitClue() {
+    const inputClue = document.getElementById("input-clue");
+    if (!inputClue) return;
+    const clueTextVal = inputClue.value.trim();
+
+    if (!clueTextVal) {
+        showToast("Clue cannot be empty");
+        return;
+    }
+
+    if (clueTextVal.length > 100) {
+        showToast("Clue must be 100 characters or less");
+        return;
+    }
+
+    const result = await apiRequest("/api/game/clue", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clue: clueTextVal })
+    });
+
+    if (!result.ok) {
+        showToast(result.error);
+        return;
+    }
+
+    showToast("Clue submitted successfully!");
+
+    // Hide clue submit box
+    const clueSubmitContainer = document.getElementById("clue-submit-container");
+    if (clueSubmitContainer) {
+        clueSubmitContainer.style.display = "none";
+    }
+
+    // Show clue banner with the submitted text
+    const clueContainer = document.getElementById("clue-container");
+    const clueText = document.getElementById("clue-text");
+    if (clueContainer && clueText) {
+        clueText.innerText = clueTextVal;
+        clueContainer.style.display = "block";
+    }
 }

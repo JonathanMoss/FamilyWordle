@@ -98,7 +98,9 @@ This document details the REST API endpoints exposed by the Flask backend for co
         }
       ],
       "target_word": "CRANE", // ONLY provided if status is "won", "lost", or "expired"
-      "remaining_seconds": 38400 // time left until rollover at 00:01 Europe/London
+      "remaining_seconds": 38400, // time left until rollover at 00:01 Europe/London
+      "clue": "string | null", // optional clue submitted by the first solver
+      "is_first_solver": false // true if the player is the first solver today
     }
     ```
   * **401 Unauthorized**:
@@ -124,7 +126,8 @@ This document details the REST API endpoints exposed by the Flask backend for co
       "status": "playing | won | lost | expired",
       "feedback": ["correct", "absent", "present", "absent", "absent"],
       "attempts_used": 4,
-      "target_word": "CRANE" // ONLY provided if game transitions to "won", "lost", or "expired"
+      "target_word": "CRANE", // ONLY provided if game transitions to "won", "lost", or "expired"
+      "is_first_solver": false // true if this guess won today's daily game first
     }
     ```
   * **400 Bad Request** (Invalid guess word, non-dictionary, incorrect length):
@@ -293,3 +296,39 @@ This document details the REST API endpoints exposed by the Flask backend for co
       "message": "Player updated successfully"
     }
     ```
+
+---
+
+## Clue Endpoints
+
+### 14. Submit Daily Clue
+* **Endpoint**: `POST /api/game/clue`
+* **Description**: Submit a short hint or clue for today's daily word. Only valid for the first solver who won today.
+* **Request Header**: `Content-Type: application/json`
+* **Request Body**:
+  ```json
+  {
+    "clue": "string (1-100 characters)"
+  }
+  ```
+* **Responses**:
+  * **200 OK**:
+    ```json
+    {
+      "status": "success",
+      "clue": "Today is a head scratcher!"
+    }
+    ```
+  * **400 Bad Request** (validation fails - empty or too long):
+    ```json
+    {
+      "error": "Clue is too long (maximum 100 characters)"
+    }
+    ```
+  * **403 Forbidden** (user has not solved the game yet, or is not the first solver):
+    ```json
+    {
+      "error": "You must win today's game to submit a clue"
+    }
+    ```
+
