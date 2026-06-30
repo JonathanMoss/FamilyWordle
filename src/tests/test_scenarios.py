@@ -1299,3 +1299,56 @@ def bot_receives_8_words():
     assert isinstance(words, list)
     assert len(words) == 8
     assert "LEARN" in words
+
+# Step definitions for Daily Solver Clues (10-daily-clues.feature)
+@then("the response should indicate I am the first solver")
+def response_indicate_first_solver():
+    res = test_state["last_response"]
+    assert res.status_code == 200
+    assert res.json.get("is_first_solver") is True
+
+@then("the response should indicate I am not the first solver")
+def response_indicate_not_first_solver():
+    res = test_state["last_response"]
+    assert res.status_code == 200
+    assert res.json.get("is_first_solver") is False
+
+@when(parsers.parse('I submit a daily clue "{clue}"'))
+def submit_daily_clue(client, clue):
+    test_state["last_response"] = client.post("/api/game/clue", json={"clue": clue})
+
+@then("the clue should be successfully saved")
+def clue_saved_successfully():
+    res = test_state["last_response"]
+    assert res.status_code == 200
+    assert res.json.get("status") == "success"
+
+@when("I retrieve the current daily game state")
+def retrieve_daily_game_state(client):
+    test_state["last_response"] = client.get("/api/game/state")
+
+@then(parsers.parse('the game state should include the clue "{clue}"'))
+def game_state_includes_clue(clue):
+    res = test_state["last_response"]
+    assert res.status_code == 200
+    assert res.json.get("clue") == clue
+
+@then("the game state should indicate I am not the first solver")
+def game_state_not_first_solver():
+    res = test_state["last_response"]
+    assert res.status_code == 200
+    assert res.json.get("is_first_solver") is False
+
+@when(parsers.parse('I attempt to submit a daily clue "{clue}"'))
+def attempt_submit_clue(client, clue):
+    test_state["last_response"] = client.post("/api/game/clue", json={"clue": clue})
+
+@then("the clue submission should be rejected")
+def clue_submission_rejected():
+    res = test_state["last_response"]
+    assert res.status_code in [400, 403]
+
+@when("I attempt to submit a daily clue that is too long")
+def attempt_submit_long_clue(client):
+    long_clue = "a" * 101
+    test_state["last_response"] = client.post("/api/game/clue", json={"clue": long_clue})

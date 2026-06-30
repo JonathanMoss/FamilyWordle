@@ -51,6 +51,18 @@ class DailyWord(SQLModel, table=True):
     date: str = Field(primary_key=True, description="Calendar date in YYYY-MM-DD format")
     word: str = Field(min_length=5, max_length=5, description="The daily target 5-letter word")
     selected_at: datetime = Field(default_factory=utc_now)
+    clue: Optional[str] = Field(
+        default=None,
+        nullable=True,
+        max_length=100,
+        description="Optional clue/hint for subsequent players"
+    )
+    clue_by_player_id: Optional[int] = Field(
+        default=None,
+        foreign_key="player.id",
+        nullable=True,
+        description="ID of the first player who guessed the word"
+    )
 
 class DailyGame(SQLModel, table=True):
     """

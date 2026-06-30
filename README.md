@@ -19,6 +19,7 @@ The application features a dark-themed glassmorphic UI, structured database stor
   2. **Average Turns**: Fewer average attempts per completed game ranks higher.
   3. **Current Streak**: Consecutive days of completed daily games (resets if a day is missed).
 * **Practice Mode, Replays & Spectator Bot**: Unregistered or signed-out users can play a demo game to practice. Demo mode also includes an interactive **Spectator Bot Autoplay** that uses a letter-frequency solver heuristic to automatically type and solve random words step-by-step. Signed-in players can browse the Chronological Archive and click "Play" to replay any past daily word in an isolated sandbox. Replay games do not affect official statistics, active streaks, or the daily game state.
+* **Daily Clue/Prompt**: The first player to solve today's daily word is given the option to input a short clue or hint (up to 100 characters) for the rest of the family. This clue is then displayed to all other players when they play today's game.
 
 ---
 

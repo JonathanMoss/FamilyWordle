@@ -83,6 +83,12 @@
                 <div id="game-timer" style="font-size:0.85rem; color:var(--text-secondary); margin-top:8px;"></div>
             </div>
 
+            <!-- Clue/Hint Banner -->
+            <div id="clue-container" class="glass-panel" style="display:none; margin: 0 auto 15px auto; padding: 10px 16px; max-width: 500px; text-align: center; border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; background: rgba(245, 158, 11, 0.05);">
+                <span style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-present); font-weight: 600; display: block; margin-bottom: 4px;">💡 Clue from 1st Solver</span>
+                <span id="clue-text" style="font-size: 0.95rem; color: var(--text-primary); font-style: italic;"></span>
+            </div>
+
             <!-- Game Board Grid -->
             <div id="game-grid">
                 <!-- Javascript will render 6 rows of 5 tiles -->
@@ -96,6 +102,16 @@
             <!-- Virtual Keyboard -->
             <div id="keyboard">
                 <!-- Javascript will render QWERTY keys -->
+            </div>
+
+            <!-- Clue Submission Container (for first solver only) -->
+            <div id="clue-submit-container" class="glass-panel" style="display:none; margin: 15px auto; padding: 15px; max-width: 500px; text-align: center; border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 12px; background: rgba(16, 185, 129, 0.05);">
+                <h3 style="font-size: 1.05rem; color: var(--color-correct); margin-bottom: 6px; font-weight: 600;">🎉 You guessed today's word first!</h3>
+                <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px;">Leave an optional clue/hint for the rest of the family:</p>
+                <div style="display: flex; gap: 8px; justify-content: center; align-items: center;">
+                    <input type="text" id="input-clue" class="form-control-premium" placeholder="e.g. Think plural..." maxlength="100" style="flex: 1; max-width: 320px; font-family: inherit; font-size: 0.9rem;">
+                    <button class="btn-premium" onclick="submitClue()" style="background: rgba(16, 185, 129, 0.15); border-color: var(--color-correct); color: var(--color-correct); cursor: pointer; padding: 0 16px; height: 38px;">Submit Clue</button>
+                </div>
             </div>
 
             <!-- Share results block -->

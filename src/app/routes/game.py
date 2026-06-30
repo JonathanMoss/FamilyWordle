@@ -45,6 +45,11 @@ def game_state():
         today_str = get_current_date_str()
         daily_word = get_or_create_daily_word(db_session)
 
+        # Fetch the daily word object to get the clue
+        stmt_word = select(DailyWord).where(DailyWord.date == today_str)
+        dw_obj = db_session.exec(stmt_word).first()
+        clue = dw_obj.clue if (dw_obj and dw_obj.clue) else None
+
         # Query player's daily game
         stmt = select(DailyGame).where(
             DailyGame.player_id == user_id,
@@ -54,13 +59,26 @@ def game_state():
 
         remaining_seconds = get_remaining_seconds()
 
+        # Determine if first solver
+        is_first_solver = False
+        if game and game.status == GameStatus.WON.value:
+            stmt_wins = select(DailyGame).where(
+                DailyGame.date == today_str,
+                DailyGame.status == GameStatus.WON.value
+            ).order_by(DailyGame.updated_at.asc())
+            wins = db_session.exec(stmt_wins).all()
+            if wins and wins[0].player_id == user_id:
+                is_first_solver = True
+
         if not game:
             return jsonify({
                 "status": "not_started",
                 "attempts_used": 0,
                 "max_attempts": 6,
                 "guesses": [],
-                "remaining_seconds": remaining_seconds
+                "remaining_seconds": remaining_seconds,
+                "clue": clue,
+                "is_first_solver": is_first_solver
             }), 200
 
         guesses = json.loads(game.guesses_json)
@@ -69,7 +87,9 @@ def game_state():
             "attempts_used": game.attempts_used,
             "max_attempts": 6,
             "guesses": guesses,
-            "remaining_seconds": remaining_seconds
+            "remaining_seconds": remaining_seconds,
+            "clue": clue,
+            "is_first_solver": is_first_solver
         }
 
         # Expose word if complete
@@ -157,15 +177,83 @@ def game_guess():
         db_session.commit()
         db_session.refresh(game)
 
+        # Determine if first solver
+        is_first_solver = False
+        if game.status == GameStatus.WON.value:
+            stmt_others = select(DailyGame).where(
+                DailyGame.date == today_str,
+                DailyGame.status == GameStatus.WON.value,
+                DailyGame.player_id != user_id
+            )
+            others = db_session.exec(stmt_others).all()
+            if not others:
+                is_first_solver = True
+
         response = {
             "status": game.status,
             "feedback": feedback,
-            "attempts_used": game.attempts_used
+            "attempts_used": game.attempts_used,
+            "is_first_solver": is_first_solver
         }
         if game.status in [GameStatus.WON.value, GameStatus.LOST.value]:
             response["target_word"] = daily_word
 
         return jsonify(response), 200
+
+@game_bp.route("/game/clue", methods=["POST"])
+@login_required
+def submit_clue():
+    """Submit a clue for today's daily word (only valid for the first solver)."""
+    user_id = session.get("user_id")
+    data = request.get_json() or {}
+    clue = data.get("clue", "").strip()
+
+    if not clue:
+        return jsonify({"error": "Clue cannot be empty"}), 400
+
+    if len(clue) > 100:
+        return jsonify({"error": "Clue is too long (maximum 100 characters)"}), 400
+
+    engine = get_engine()
+    with Session(engine) as db_session:
+        today_str = get_current_date_str()
+
+        # Verify the user has won today's game
+        stmt_game = select(DailyGame).where(
+            DailyGame.player_id == user_id,
+            DailyGame.date == today_str,
+            DailyGame.status == GameStatus.WON.value
+        )
+        game = db_session.exec(stmt_game).first()
+        if not game:
+            return jsonify({"error": "You must win today's game to submit a clue"}), 403
+
+        # Verify they are the first solver
+        stmt_others = select(DailyGame).where(
+            DailyGame.date == today_str,
+            DailyGame.status == GameStatus.WON.value,
+            DailyGame.player_id != user_id
+        )
+        other_wins = db_session.exec(stmt_others).all()
+        if other_wins:
+            return jsonify({"error": "You are not the first solver today"}), 403
+
+        # Get the DailyWord record
+        stmt_word = select(DailyWord).where(DailyWord.date == today_str)
+        daily_word = db_session.exec(stmt_word).first()
+        if not daily_word:
+            return jsonify({"error": "Daily word not initialized"}), 500
+
+        # Update clue
+        daily_word.clue = clue
+        daily_word.clue_by_player_id = user_id
+        db_session.add(daily_word)
+        db_session.commit()
+
+        return jsonify({
+            "status": "success",
+            "clue": clue
+        }), 200
 
 # Isolated Demo Mode Logic (Stored in session)
 DEMO_TARGET = "LEARN"
