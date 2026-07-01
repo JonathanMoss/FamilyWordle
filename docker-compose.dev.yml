@@ -12,3 +12,6 @@ services:
       - SECRET_KEY=dev-secret-key-for-local-use
       - ADMIN_USERNAME=admin
       - ADMIN_PIN=1234
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4

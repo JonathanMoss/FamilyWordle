@@ -1352,3 +1352,109 @@ def clue_submission_rejected():
 def attempt_submit_long_clue(client):
     long_clue = "a" * 101
     test_state["last_response"] = client.post("/api/game/clue", json={"clue": long_clue})
+
+
+# Step definitions for Daily Word Definitions (11-daily-definitions.feature)
+@given(parsers.parse('the definition of "{word}" is "{definition}"'))
+def set_daily_word_definition_test(app, word, definition):
+    from sqlmodel import Session
+    from src.app import get_engine
+    with Session(get_engine()) as session:
+        stmt = select(DailyWord).where(DailyWord.word == word)
+        dw = session.exec(stmt).first()
+        if dw:
+            dw.definition = definition
+            session.add(dw)
+            session.commit()
+
+@when("I request the current game state")
+@given("I request the current game state")
+def request_current_game_state_test(client):
+    test_state["last_response"] = client.get("/api/game/state")
+
+@then("the response should not include a word definition")
+def response_no_definition_test():
+    res = test_state["last_response"]
+    assert res.status_code == 200
+    assert "definition" not in res.json
+
+@then(parsers.parse('the response should include the definition "{definition}"'))
+def response_includes_definition_test(definition):
+    res = test_state["last_response"]
+    assert res.status_code == 200
+    assert res.json.get("definition") == definition
+
+
+# Unit tests for word definition fetching and error handling
+def test_fetch_word_definition_success(monkeypatch):
+    import urllib.request
+    from io import BytesIO
+    from src.app.services import _real_fetch_word_definition
+
+    mock_response = BytesIO(json.dumps([
+        {
+            "word": "crane",
+            "meanings": [
+                {
+                    "partOfSpeech": "noun",
+                    "definitions": [
+                        {"definition": "A large, tall machine used for moving heavy objects."}
+                    ]
+                }
+            ]
+        }
+    ]).encode("utf-8"))
+
+    class MockResponse:
+        def __init__(self):
+            self.status = 200
+        def read(self):
+            return mock_response.read()
+        def __enter__(self):
+            return self
+        def __exit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+    monkeypatch.setattr(urllib.request, "urlopen", lambda *args, **kwargs: MockResponse())
+
+    res = _real_fetch_word_definition("crane")
+    assert res == "(noun) A large, tall machine used for moving heavy objects."
+
+def test_fetch_word_definition_failure(monkeypatch):
+    import urllib.request
+    import urllib.error
+    from src.app.services import _real_fetch_word_definition
+
+    def mock_urlopen_fail(*args, **kwargs):
+        raise urllib.error.URLError("API Offline")
+
+    monkeypatch.setattr(urllib.request, "urlopen", mock_urlopen_fail)
+
+    res = _real_fetch_word_definition("crane")
+    assert res is None
+
+
+def test_backfill_definitions_script(monkeypatch, app, db_session):
+    from sqlalchemy import text
+    from scripts.backfill_definitions import run_migration_and_backfill
+
+    # Clear existing daily words and add one without definition
+    db_session.exec(text("DELETE FROM dailyword"))
+    db_session.commit()
+
+    dw = DailyWord(date="2026-06-20", word="CRANE", definition=None)
+    db_session.add(dw)
+    db_session.commit()
+
+    # Mock the database engine to use our in-memory DB engine instead of the dev file
+    import src.app as app_module
+    monkeypatch.setattr("scripts.backfill_definitions.get_engine", lambda: app_module.DB_ENGINE)
+
+    # Run the backfill script
+    run_migration_and_backfill()
+
+    # Verify the definition was populated
+    stmt = select(DailyWord).where(DailyWord.date == "2026-06-20")
+    updated_dw = db_session.exec(stmt).first()
+    assert updated_dw is not None
+    assert updated_dw.definition == "(noun) Mocked definition for CRANE"

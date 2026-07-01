@@ -119,6 +119,17 @@
                 <button id="btn-share-result" class="btn-premium" onclick="shareResult()">Share Score</button>
             </div>
 
+            <!-- Word definition block -->
+            <div id="definition-container" class="glass-panel" style="display:none; margin: 15px auto; padding: 15px; max-width: 500px; text-align: center; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; background: rgba(255, 255, 255, 0.02);">
+                <button id="btn-toggle-definition" class="btn-premium" onclick="toggleDefinition()" style="padding: 6px 16px; font-size: 0.9rem;">📖 See Word Definition</button>
+                <div id="definition-content" style="display:none; margin-top:12px; text-align: left; border-top: 1px solid rgba(255, 255, 255, 0.1); padding-top: 12px;">
+                    <p style="font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); font-weight: 600; margin-bottom: 6px;">
+                        Dictionary Definition
+                    </p>
+                    <p id="definition-text" style="font-size: 0.95rem; color: var(--text-primary); margin: 0; line-height: 1.4; font-style: italic;"></p>
+                </div>
+            </div>
+
             <div style="text-align:center; margin-top:15px; display:none;" id="demo-exit-container">
                 <button class="btn-premium" onclick="exitDemoMode()">Exit Demo Mode</button>
                 <button class="btn-premium" onclick="resetDemoMode()" style="margin-left:8px;">Replay Demo</button>

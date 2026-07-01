@@ -495,6 +495,22 @@ async function loadActiveGame() {
         }
     }
 
+    // Render Definition
+    const defContainer = document.getElementById("definition-container");
+    const defText = document.getElementById("definition-text");
+    const defContent = document.getElementById("definition-content");
+    const defBtn = document.getElementById("btn-toggle-definition");
+    if (defContainer && defText) {
+        if (data.definition) {
+            defText.innerText = data.definition;
+            defContainer.style.display = "block";
+            if (defContent) defContent.style.display = "none";
+            if (defBtn) defBtn.innerText = "📖 See Word Definition";
+        } else {
+            defContainer.style.display = "none";
+        }
+    }
+
     const banner = document.getElementById("game-mode-banner");
     if (banner) {
         banner.innerText = "DAILY GAME";
@@ -718,6 +734,22 @@ async function submitInputGuess() {
     if (shareContainer && (data.status === "won" || data.status === "lost")) {
         shareContainer.style.display = "block";
     }
+
+    // Reveal Definition if available
+    const defContainer = document.getElementById("definition-container");
+    const defText = document.getElementById("definition-text");
+    const defContent = document.getElementById("definition-content");
+    const defBtn = document.getElementById("btn-toggle-definition");
+    if (defContainer && defText) {
+        if (data.definition) {
+            defText.innerText = data.definition;
+            defContainer.style.display = "block";
+            if (defContent) defContent.style.display = "none";
+            if (defBtn) defBtn.innerText = "📖 See Word Definition";
+        } else {
+            defContainer.style.display = "none";
+        }
+    }
 }
 
 function shakeRow(rowIdx) {
@@ -836,11 +868,13 @@ async function loadDemoGame() {
     });
     
     
-    // Hide daily clue containers in demo mode
+    // Hide daily clue/definition containers in demo mode
     const clueContainer = document.getElementById("clue-container");
     const clueSubmitContainer = document.getElementById("clue-submit-container");
+    const defContainer = document.getElementById("definition-container");
     if (clueContainer) clueContainer.style.display = "none";
     if (clueSubmitContainer) clueSubmitContainer.style.display = "none";
+    if (defContainer) defContainer.style.display = "none";
 
     showView("game-view");
 }
@@ -1516,5 +1550,18 @@ async function submitClue() {
     if (clueContainer && clueText) {
         clueText.innerText = clueTextVal;
         clueContainer.style.display = "block";
+    }
+}
+
+function toggleDefinition() {
+    const content = document.getElementById("definition-content");
+    const btn = document.getElementById("btn-toggle-definition");
+    if (!content || !btn) return;
+    if (content.style.display === "none") {
+        content.style.display = "block";
+        btn.innerText = "📕 Hide Definition";
+    } else {
+        content.style.display = "none";
+        btn.innerText = "📖 See Word Definition";
     }
 }

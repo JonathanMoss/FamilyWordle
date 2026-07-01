@@ -92,9 +92,10 @@ def game_state():
             "is_first_solver": is_first_solver
         }
 
-        # Expose word if complete
+        # Expose word and definition if complete
         if game.status in [GameStatus.WON.value, GameStatus.LOST.value, GameStatus.EXPIRED.value]:
             response["target_word"] = daily_word
+            response["definition"] = dw_obj.definition if dw_obj else None
 
         return jsonify(response), 200
 
@@ -197,6 +198,9 @@ def game_guess():
         }
         if game.status in [GameStatus.WON.value, GameStatus.LOST.value]:
             response["target_word"] = daily_word
+            stmt_word = select(DailyWord).where(DailyWord.date == today_str)
+            dw_obj = db_session.exec(stmt_word).first()
+            response["definition"] = dw_obj.definition if dw_obj else None
 
         return jsonify(response), 200
 
