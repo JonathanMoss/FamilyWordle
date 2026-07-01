@@ -28,3 +28,4 @@ Rules:
 - A full archive of previously used daily words and their dates is retained and available to players.
 
 - Initial administrator accounts must be created out-of-band via a backend CLI bootstrapping command, preventing public users from granting themselves administrative access.
+- A dictionary definition of the daily word is fetched once per day from the Free Dictionary API when the daily word is generated and cached in the database. When a player completes their daily game (wins or loses), this definition is made available via the API and displayed in the frontend via a toggle button, helping players understand obscure target words.

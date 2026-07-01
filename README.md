@@ -20,6 +20,7 @@ The application features a dark-themed glassmorphic UI, structured database stor
   3. **Current Streak**: Consecutive days of completed daily games (resets if a day is missed).
 * **Practice Mode, Replays & Spectator Bot**: Unregistered or signed-out users can play a demo game to practice. Demo mode also includes an interactive **Spectator Bot Autoplay** that uses a letter-frequency solver heuristic to automatically type and solve random words step-by-step. Signed-in players can browse the Chronological Archive and click "Play" to replay any past daily word in an isolated sandbox. Replay games do not affect official statistics, active streaks, or the daily game state.
 * **Daily Clue/Prompt**: The first player to solve today's daily word is given the option to input a short clue or hint (up to 100 characters) for the rest of the family. This clue is then displayed to all other players when they play today's game.
+* **Daily Word Definition**: To help players expand their vocabulary or learn obscure target words, the system automatically fetches a definition from the Free Dictionary API once per day when the word is generated. This definition is kept secret during gameplay and is only revealed to a player via a toggleable "Define Word" button once they complete their daily game (win or loss).
 
 ---
 

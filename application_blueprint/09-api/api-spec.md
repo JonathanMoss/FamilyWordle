@@ -98,6 +98,7 @@ This document details the REST API endpoints exposed by the Flask backend for co
         }
       ],
       "target_word": "CRANE", // ONLY provided if status is "won", "lost", or "expired"
+      "definition": "(noun) A large bird...", // ONLY provided if status is "won", "lost", or "expired" (or null if API lookup failed)
       "remaining_seconds": 38400, // time left until rollover at 00:01 Europe/London
       "clue": "string | null", // optional clue submitted by the first solver
       "is_first_solver": false // true if the player is the first solver today
@@ -127,6 +128,7 @@ This document details the REST API endpoints exposed by the Flask backend for co
       "feedback": ["correct", "absent", "present", "absent", "absent"],
       "attempts_used": 4,
       "target_word": "CRANE", // ONLY provided if game transitions to "won", "lost", or "expired"
+      "definition": "(noun) A large bird...", // ONLY provided if game transitions to "won", "lost", or "expired"
       "is_first_solver": false // true if this guess won today's daily game first
     }
     ```

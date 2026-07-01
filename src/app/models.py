@@ -63,6 +63,12 @@ class DailyWord(SQLModel, table=True):
         nullable=True,
         description="ID of the first player who guessed the word"
     )
+    definition: Optional[str] = Field(
+        default=None,
+        nullable=True,
+        max_length=500,
+        description="Optional dictionary definition/explanation of the target word"
+    )
 
 class DailyGame(SQLModel, table=True):
     """

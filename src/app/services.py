@@ -5,11 +5,16 @@ streak calculations, and league table rankings.
 """
 import random
 from datetime import datetime, timedelta
-from typing import List, Dict
+from typing import List, Dict, Optional
 from zoneinfo import ZoneInfo
+import urllib.request
+import json
+import logging
 import bcrypt
 from sqlmodel import Session, select
 from src.app.models import Player, DailyWord, DailyGame, PlayerStatus, GameStatus
+
+logger = logging.getLogger(__name__)
 
 # Timezone context
 LONDON_TZ = ZoneInfo("Europe/London")
@@ -88,6 +93,38 @@ def get_current_date_str() -> str:
     """Get today's date in Europe/London timezone as YYYY-MM-DD."""
     return datetime.now(LONDON_TZ).strftime("%Y-%m-%d")
 
+def fetch_word_definition(word: str) -> Optional[str]:
+    """
+    Fetch the dictionary definition of a word from the Free Dictionary API.
+    Returns a formatted string like: "(noun) A large, tall machine..."
+    Returns None if not found or the API is unavailable.
+    """
+    url = f"https://api.dictionaryapi.dev/api/v2/entries/en/{word.lower()}"
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "FamilyWordle/1.0"}
+        )
+        with urllib.request.urlopen(req, timeout=5) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode())
+                if data and isinstance(data, list):
+                    meanings = data[0].get("meanings", [])
+                    if meanings:
+                        part_of_speech = meanings[0].get("partOfSpeech", "")
+                        definitions = meanings[0].get("definitions", [])
+                        if definitions:
+                            definition_text = definitions[0].get("definition", "")
+                            if part_of_speech:
+                                return f"({part_of_speech}) {definition_text}"
+                            return definition_text
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logger.warning("Failed to fetch dictionary definition for word '%s': %s", word, e)
+    return None
+
+# Reference to the actual API call (useful for testing when mocked globally)
+_real_fetch_word_definition = fetch_word_definition
+
 def get_or_create_daily_word(session: Session) -> str:
     """
     Retrieve today's daily word. If not selected, select a new word
@@ -132,7 +169,8 @@ def get_or_create_daily_word(session: Session) -> str:
 
     # Select random word and write to database
     selected = random.choice(available_words).upper()
-    new_daily = DailyWord(date=today_str, word=selected)
+    definition = fetch_word_definition(selected)
+    new_daily = DailyWord(date=today_str, word=selected, definition=definition)
     session.add(new_daily)
     session.commit()
 

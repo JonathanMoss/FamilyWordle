@@ -37,9 +37,14 @@ def db_session_fixture(app):
 
 @pytest.fixture(autouse=True)
 def mock_permitted_words(monkeypatch):
-    """Mock the dictionary words to keep tests predictable."""
+    """Mock the dictionary words and definitions to keep tests predictable and fast."""
     import src.app.services as services
     services._permitted_words_set = None  # pylint: disable=protected-access
     monkeypatch.setattr(services, "load_permitted_words", lambda *args: [
         "CRANE", "SLATE", "REACT", "STARE", "LIGHT", "TIGER", "HOUSE", "LEARN"
     ])
+    monkeypatch.setattr(
+        services,
+        "fetch_word_definition",
+        lambda word: f"(noun) Mocked definition for {word}"
+    )

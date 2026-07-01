@@ -53,6 +53,18 @@ def create_app(db_uri: Optional[str] = None) -> Flask:
     # Create database tables
     SQLModel.metadata.create_all(engine)
 
+    # Self-healing migration: Add definition column to dailyword table if it does not exist
+    from sqlalchemy import text
+    if engine.dialect.name == "sqlite":
+        with Session(engine) as db_session:
+            cursor = db_session.connection().execute(text("PRAGMA table_info(dailyword)"))
+            columns = [row[1] for row in cursor.fetchall()]
+            if "definition" not in columns:
+                db_session.connection().execute(
+                    text("ALTER TABLE dailyword ADD COLUMN definition TEXT")
+                )
+                db_session.commit()
+
     # Auto-seed default admin if configured in environment
     admin_username = os.getenv("ADMIN_USERNAME")
     admin_pin = os.getenv("ADMIN_PIN")
