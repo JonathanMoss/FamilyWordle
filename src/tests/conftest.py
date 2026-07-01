@@ -19,8 +19,10 @@ def app_fixture():
     with app.app_context():
         yield app
 
-    # Reset DB_ENGINE global to avoid database caching across tests
+    # Reset DB_ENGINE and dispose engine to avoid caching and unclosed connection warnings
     import src.app as app_module
+    if app_module.DB_ENGINE:
+        app_module.DB_ENGINE.dispose()
     app_module.DB_ENGINE = None
 
 @pytest.fixture(name="client")
